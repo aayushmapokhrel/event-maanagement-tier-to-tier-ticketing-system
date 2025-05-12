@@ -1,0 +1,131 @@
+{% extends 'admin_dashboard/base.html' %}
+
+{% block title %}Admin Dashboard - Users{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">User Management</h6>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="fas fa-user-plus"></i> Add User
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Date Joined</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>
+                                {% if user.is_superuser %}
+                                    Admin
+                                {% elif user.is_staff %}
+                                    Staff
+                                {% else %}
+                                    User
+                                {% endif %}
+                            </td>
+                            <td>{{ user.date_joined|date:"Y-m-d" }}</td>
+                            <td>
+                                <span class="badge bg-{% if user.is_active %}success{% else %}danger{% endif %}">
+                                    {% if user.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="editUser('{{ user.id }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-{% if user.is_active %}warning{% else %}success{% endif %}"
+                                        onclick="toggleUserStatus('{{ user.id }}')">
+                                    <i class="fas fa-{% if user.is_active %}ban{% else %}check{% endif %}"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteUser('{{ user.id }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm" method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Role</label>
+                        <select class="form-select" id="role" name="role">
+                            <option value="user">User</option>
+                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="submit" form="addUserForm" class="btn btn-primary">Add User</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function editUser(userId) {
+        // Implement edit user functionality
+    }
+
+    function toggleUserStatus(userId) {
+        // Implement user status toggle functionality
+    }
+
+    function deleteUser(userId) {
+        if (confirm('Are you sure you want to delete this user?')) {
+            // Implement delete user functionality
+        }
+    }
+
+    // Initialize DataTables
+    $(document).ready(function() {
+        $('#usersTable').DataTable();
+    });
+</script>
+{% endblock %} 

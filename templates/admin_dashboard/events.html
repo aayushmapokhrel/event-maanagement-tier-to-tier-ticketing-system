@@ -1,0 +1,145 @@
+{% extends 'admin_dashboard/base.html' %}
+
+{% block title %}Admin Dashboard - Events{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Event Management</h6>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEventModal">
+                <i class="fas fa-plus"></i> Add Event
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="eventsTable">
+                    <thead>
+                        <tr>
+                            <th>Event Name</th>
+                            <th>Organizer</th>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Tickets Sold</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                        <tr>
+                            <td>{{ event.title }}</td>
+                            <td>{{ event.organizer.username }}</td>
+                            <td>{{ event.date|date:"Y-m-d" }}</td>
+                            <td>{{ event.category }}</td>
+                            <td>{{ event.ticket_set.count }}</td>
+                            <td>
+                                <span class="badge bg-{% if event.date >= today %}primary{% else %}secondary{% endif %}">
+                                    {% if event.date >= today %}Upcoming{% else %}Past{% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="editEvent('{{ event.id }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="viewTickets('{{ event.id }}')">
+                                    <i class="fas fa-ticket-alt"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteEvent('{{ event.id }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Event Modal -->
+<div class="modal fade" id="addEventModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Event</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addEventForm" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Event Name</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="category" class="form-label">Category</label>
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="Conference">Conference</option>
+                                    <option value="Concert">Concert</option>
+                                    <option value="Workshop">Workshop</option>
+                                    <option value="Sports">Sports</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="date" class="form-label">Date</label>
+                                <input type="date" class="form-control" id="date" name="date" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="venue" class="form-label">Venue</label>
+                                <input type="text" class="form-control" id="venue" name="venue" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="capacity" class="form-label">Capacity</label>
+                                <input type="number" class="form-control" id="capacity" name="capacity" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="image" class="form-label">Event Image</label>
+                                <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="submit" form="addEventForm" class="btn btn-primary">Add Event</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function editEvent(eventId) {
+        // Implement edit event functionality
+    }
+
+    function viewTickets(eventId) {
+        window.location.href = `/admin/events/${eventId}/tickets/`;
+    }
+
+    function deleteEvent(eventId) {
+        if (confirm('Are you sure you want to delete this event?')) {
+            // Implement delete event functionality
+        }
+    }
+
+    // Initialize DataTables
+    $(document).ready(function() {
+        $('#eventsTable').DataTable();
+    });
+</script>
+{% endblock %} 

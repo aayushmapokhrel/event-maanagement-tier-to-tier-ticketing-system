@@ -1,0 +1,145 @@
+{% extends 'admin_dashboard/base.html' %}
+
+{% block title %}Admin Dashboard - Reviews{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="container-fluid">
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Review Management</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="reviewsTable">
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>User</th>
+                            <th>Rating</th>
+                            <th>Comment</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for review in reviews %}
+                        <tr>
+                            <td>{{ review.event.title }}</td>
+                            <td>{{ review.user.username }}</td>
+                            <td>
+                                <div class="rating-stars">
+                                    {% for i in "12345" %}
+                                        {% if forloop.counter <= review.rating %}
+                                            <i class="fas fa-star text-warning"></i>
+                                        {% else %}
+                                            <i class="far fa-star"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <span class="ms-2">({{ review.rating }}/5)</span>
+                                </div>
+                            </td>
+                            <td>{{ review.comment }}</td>
+                            <td>{{ review.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="viewReview('{{ review.id }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% if not review.is_approved %}
+                                <button class="btn btn-sm btn-success" onclick="approveReview('{{ review.id }}')">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-danger" onclick="deleteReview('{{ review.id }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Review Details Modal -->
+<div class="modal fade" id="reviewDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Review Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="reviewDetails">
+                    <!-- Review details will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function viewReview(reviewId) {
+        // Implement view review details functionality
+        $('#reviewDetailsModal').modal('show');
+    }
+
+    function approveReview(reviewId) {
+        if (confirm('Are you sure you want to approve this review?')) {
+            fetch(`/custom-admin/reviews/${reviewId}/approve/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Failed to approve review');
+                }
+            });
+        }
+    }
+
+    function deleteReview(reviewId) {
+        if (confirm('Are you sure you want to delete this review?')) {
+            fetch(`/custom-admin/reviews/${reviewId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Failed to delete review');
+                }
+            });
+        }
+    }
+
+    // Initialize DataTables
+    $(document).ready(function() {
+        $('#reviewsTable').DataTable({
+            order: [[4, 'desc']], // Sort by date by default
+            pageLength: 25,
+            columnDefs: [
+                { targets: 2, orderable: true }, // Rating column
+                { targets: 3, orderable: false }, // Comment column
+                { targets: 5, orderable: false }  // Actions column
+            ]
+        });
+    });
+</script>
+{% endblock %} 

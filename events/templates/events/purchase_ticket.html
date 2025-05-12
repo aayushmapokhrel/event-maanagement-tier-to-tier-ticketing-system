@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Purchase Ticket - {{ ticket_tier.event.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="card-title mb-0">Purchase Ticket</h4>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ ticket_tier.event.title }}</h5>
+                    <h6 class="text-muted">{{ ticket_tier.name }}</h6>
+                    
+                    <div class="mb-4">
+                        <p><strong>Event Date:</strong> {{ ticket_tier.event.date|date:"F j, Y" }}</p>
+                        <p><strong>Event Time:</strong> {{ ticket_tier.event.time|time:"g:i A" }}</p>
+                        <p><strong>Venue:</strong> {{ ticket_tier.event.venue }}</p>
+                        <p><strong>Price:</strong> NPR {{ ticket_tier.price }}</p>
+                        <p><strong>Available Tickets:</strong> {{ ticket_tier.available_tickets }}</p>
+                    </div>
+
+                    {% if ticket_tier.description %}
+                    <div class="mb-4">
+                        <h6>Ticket Description:</h6>
+                        <p>{{ ticket_tier.description }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if ticket_tier.available_tickets > 0 %}
+                        <form method="post" class="mt-4">
+                            {% csrf_token %}
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-shopping-cart me-2"></i>Proceed to Payment
+                                </button>
+                                <a href="{% url 'event_detail' ticket_tier.event.id %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Back to Event
+                                </a>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Sorry, this ticket tier is sold out!
+                        </div>
+                        <div class="d-grid">
+                            <a href="{% url 'event_detail' ticket_tier.event.id %}" class="btn btn-outline-primary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Event
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://khalti.s3.ap-south-1.amazonaws.com/KPG/dist/2020.12.22.0.0.0/khalti-checkout.iffe.js"></script>
+{% endblock %} 

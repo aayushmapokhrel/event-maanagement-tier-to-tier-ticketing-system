@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Check-in Dashboard - {{ event.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        background: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .progress {
+        height: 10px;
+        border-radius: 5px;
+    }
+    .recent-checkin {
+        transition: all 0.3s ease;
+    }
+    .recent-checkin:hover {
+        transform: translateX(5px);
+    }
+    .chart-container {
+        height: 300px;
+        margin-bottom: 20px;
+    }
+    .refresh-btn {
+        border-radius: 20px;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .new-checkin {
+        animation: fadeIn 0.5s ease-out;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>{{ event.title }} - Check-in Dashboard</h2>
+                <div>
+                    <button id="refreshBtn" class="btn btn-outline-primary refresh-btn me-2">
+                        <i class="fas fa-sync-alt me-2"></i>Refresh
+                    </button>
+                    <a href="{% url 'manage_attendees' event.id %}" class="btn btn-primary">
+                        <i class="fas fa-users me-2"></i>Manage Attendees
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="stats-card">
+                <h4>Total Tickets</h4>
+                <h2 id="totalTickets">{{ stats.total_tickets }}</h2>
+                <div class="progress mt-3">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <h4>Checked In</h4>
+                <h2 id="checkedIn">{{ stats.checked_in }}</h2>
+                <div class="progress mt-3">
+                    <div class="progress-bar bg-success" role="progressbar" 
+                         style="width: {% widthratio stats.checked_in stats.total_tickets 100 %}%" 
+                         aria-valuenow="{{ stats.checked_in }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="{{ stats.total_tickets }}"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <h4>Pending Check-in</h4>
+                <h2 id="pendingCheckin">{{ stats.pending }}</h2>
+                <div class="progress mt-3">
+                    <div class="progress-bar bg-warning" role="progressbar" 
+                         style="width: {% widthratio stats.pending stats.total_tickets 100 %}%" 
+                         aria-valuenow="{{ stats.pending }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="{{ stats.total_tickets }}"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Check-in Progress by Ticket Type</h5>
+                </div>
+                <div class="card-body">
+                    {% for tier in stats.by_tier %}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <h6>{{ tier.tier__name }}</h6>
+                            <span>{{ tier.checked_in }}/{{ tier.total }}</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {% widthratio tier.checked_in tier.total 100 %}%" 
+                                 aria-valuenow="{{ tier.checked_in }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="{{ tier.total }}"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Check-ins</h5>
+                </div>
+                <div class="card-body">
+                    <div id="recentCheckins">
+                        {% for checkin in recent_checkins %}
+                        <div class="recent-checkin d-flex align-items-center p-2 border-bottom">
+                            <div class="me-3">
+                                <i class="fas fa-check-circle text-success fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0">{{ checkin.user.get_full_name|default:checkin.user.username }}</h6>
+                                <small class="text-muted">{{ checkin.tier.name }} - {{ checkin.updated_at|timesince }} ago</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const refreshBtn = document.getElementById('refreshBtn');
+    
+    function refreshDashboard() {
+        fetch(`/events/${eventId}/checkin-stats/`)
+            .then(response => response.json())
+            .then(data => {
+                // Update statistics
+                document.getElementById('totalTickets').textContent = data.total_tickets;
+                document.getElementById('checkedIn').textContent = data.checked_in;
+                document.getElementById('pendingCheckin').textContent = data.pending;
+                
+                // Update recent check-ins
+                const recentCheckinsContainer = document.getElementById('recentCheckins');
+                data.recent_checkins.forEach(checkin => {
+                    const checkinElement = document.createElement('div');
+                    checkinElement.className = 'recent-checkin new-checkin d-flex align-items-center p-2 border-bottom';
+                    checkinElement.innerHTML = `
+                        <div class="me-3">
+                            <i class="fas fa-check-circle text-success fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">${checkin.user_name}</h6>
+                            <small class="text-muted">${checkin.tier_name} - ${checkin.time_ago} ago</small>
+                        </div>
+                    `;
+                    recentCheckinsContainer.insertBefore(checkinElement, recentCheckinsContainer.firstChild);
+                });
+                
+                // Remove old check-ins to keep the list at a reasonable length
+                while (recentCheckinsContainer.children.length > 10) {
+                    recentCheckinsContainer.removeChild(recentCheckinsContainer.lastChild);
+                }
+            });
+    }
+    
+    // Refresh when button is clicked
+    refreshBtn.addEventListener('click', refreshDashboard);
+    
+    // Auto-refresh every 30 seconds
+    setInterval(refreshDashboard, 30000);
+});
+</script>
+{% endblock %} 

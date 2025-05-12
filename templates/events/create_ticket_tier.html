@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Add Ticket Tier - {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Add Ticket Tier</h4>
+                    <a href="{% url 'event_detail' event_id=event.id %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to Event
+                    </a>
+                </div>
+                <div class="card-body">
+                    <!-- Event Summary -->
+                    <div class="alert alert-info mb-4">
+                        <h5>Adding tickets for: {{ event.title }}</h5>
+                        <p class="mb-0">
+                            <i class="fas fa-calendar"></i> {{ event.date|date:"F d, Y" }} at {{ event.time|time:"g:i A" }}<br>
+                            <i class="fas fa-map-marker-alt"></i> {{ event.venue }}<br>
+                            <i class="fas fa-users"></i> Event Capacity: {{ event.capacity }}
+                        </p>
+                    </div>
+
+                    <!-- Ticket Tier Form -->
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        
+                        <div class="d-grid gap-2 mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-ticket-alt"></i> Create Ticket Tier
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Pricing Guidelines -->
+                    <div class="mt-4">
+                        <h5>Ticket Tier Guidelines</h5>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-info-circle text-primary"></i> VIP tickets typically include premium seating and exclusive benefits</li>
+                            <li><i class="fas fa-info-circle text-primary"></i> General Admission is the standard ticket type</li>
+                            <li><i class="fas fa-info-circle text-primary"></i> Early Bird tickets are discounted tickets available for early purchases</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

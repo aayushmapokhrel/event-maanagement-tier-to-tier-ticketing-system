@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Edit {{ event.title }} - Event Management System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Edit Event</h4>
+                    <a href="{% url 'event_detail' event_id=event.id %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to Event
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if event.image %}
+                    <div class="text-center mb-4">
+                        <img src="{{ event.image.url }}" alt="{{ event.title }}" class="img-fluid rounded" style="max-height: 200px;">
+                    </div>
+                    {% endif %}
+                    
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        
+                        <div class="d-grid gap-2 mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-4">
+                        <h5>Event Status</h5>
+                        <p>
+                            <strong>Created:</strong> {{ event.created_at|date:"F d, Y" }}<br>
+                            <strong>Last Updated:</strong> {{ event.updated_at|date:"F d, Y" }}<br>
+                            <strong>Status:</strong> 
+                            {% if event.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Tickets{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">My Tickets</h1>
+
+    {% if tickets %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for ticket in tickets %}
+                <div class="col">
+                    <div class="card h-100">
+                        {% if ticket.tier.event.image %}
+                            <img src="{{ ticket.tier.event.image.url }}" class="card-img-top" alt="{{ ticket.tier.event.title }}" style="height: 200px; object-fit: cover;">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ ticket.tier.event.title }}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">{{ ticket.tier.name }}</h6>
+                            
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-2"></i>{{ ticket.tier.event.date|date:"F j, Y" }}
+                                </small><br>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock me-2"></i>{{ ticket.tier.event.time|time:"g:i A" }}
+                                </small><br>
+                                <small class="text-muted">
+                                    <i class="fas fa-map-marker-alt me-2"></i>{{ ticket.tier.event.venue }}
+                                </small>
+                            </div>
+
+                            <div class="mb-3">
+                                <span class="badge {% if ticket.status == 'SOLD' %}bg-success{% else %}bg-warning{% endif %}">
+                                    {{ ticket.status }}
+                                </span>
+                                <small class="text-muted d-block mt-1">
+                                    Purchased: {{ ticket.purchase_date|date:"M j, Y" }}
+                                </small>
+                            </div>
+
+                            {% if ticket.qr_code %}
+                                <div class="text-center mb-3">
+                                    <img src="{{ ticket.qr_code.url }}" alt="Ticket QR Code" style="width: 150px; height: 150px;">
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'download_ticket' ticket.id %}" class="btn btn-primary">
+                                    <i class="fas fa-download me-2"></i>Download Ticket
+                                </a>
+                                <a href="{% url 'event_detail' ticket.tier.event.id %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-info-circle me-2"></i>Event Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info" role="alert">
+            <i class="fas fa-info-circle me-2"></i>You haven't purchased any tickets yet.
+            <a href="{% url 'event_list' %}" class="alert-link">Browse available events</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

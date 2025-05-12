@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ event.title }} - Analytics{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js" rel="stylesheet">
+<style>
+    .stats-card {
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        background: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 20px;
+    }
+    .progress {
+        height: 10px;
+        border-radius: 5px;
+    }
+    .tier-card {
+        border-left: 4px solid;
+        transition: all 0.3s ease;
+    }
+    .tier-card:hover {
+        transform: translateX(5px);
+    }
+    .tier-card.vip {
+        border-left-color: #dc3545;
+    }
+    .tier-card.general {
+        border-left-color: #28a745;
+    }
+    .tier-card.early {
+        border-left-color: #007bff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>{{ event.title }}</h2>
+            <p class="text-muted">
+                <i class="fas fa-calendar-alt me-2"></i>{{ event.date|date:"F j, Y" }}
+                <i class="fas fa-map-marker-alt ms-3 me-2"></i>{{ event.venue }}
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'manage_attendees' event.id %}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-users me-2"></i>Manage Attendees
+            </a>
+            <a href="{% url 'edit_event' event.id %}" class="btn btn-primary">
+                <i class="fas fa-edit me-2"></i>Edit Event
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h4>Total Sales</h4>
+                <h2>{{ ticket_stats.total_sold }}</h2>
+                <p class="text-muted mb-0">tickets sold</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h4>Revenue</h4>
+                <h2>Rs. {{ ticket_stats.total_revenue|default:"0" }}</h2>
+                <p class="text-muted mb-0">total earnings</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h4>Average Price</h4>
+                <h2>Rs. {{ ticket_stats.avg_price|default:"0"|floatformat:2 }}</h2>
+                <p class="text-muted mb-0">per ticket</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h4>Check-ins</h4>
+                <h2>{{ checkin_stats.total_checked }}/{{ ticket_stats.total_sold }}</h2>
+                <p class="text-muted mb-0">attendees arrived</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales Chart -->
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Daily Sales</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="salesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Ticket Tiers Performance</h5>
+                </div>
+                <div class="card-body">
+                    {% for tier in tier_sales %}
+                    <div class="tier-card p-3 mb-3 {% if tier.name == 'VIP' %}vip{% elif tier.name == 'GENERAL' %}general{% else %}early{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">{{ tier.name }}</h6>
+                            <span class="badge {% if tier.name == 'VIP' %}bg-danger{% elif tier.name == 'GENERAL' %}bg-success{% else %}bg-primary{% endif %}">
+                                {{ tier.sold }} sold
+                            </span>
+                        </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar {% if tier.name == 'VIP' %}bg-danger{% elif tier.name == 'GENERAL' %}bg-success{% else %}bg-primary{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {% widthratio tier.sold tier.quantity 100 %}%" 
+                                 aria-valuenow="{% widthratio tier.sold tier.quantity 100 %}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100"></div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">Rs. {{ tier.price }} per ticket</small>
+                            <small class="text-muted">Revenue: Rs. {{ tier.revenue|default:"0" }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Check-in Progress -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Check-in Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 20px;">
+                        <div class="progress-bar bg-success" 
+                             role="progressbar" 
+                             style="width: {% widthratio checkin_stats.total_checked ticket_stats.total_sold 100 %}%" 
+                             aria-valuenow="{% widthratio checkin_stats.total_checked ticket_stats.total_sold 100 %}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {{ checkin_stats.total_checked }} Checked In
+                        </div>
+                        <div class="progress-bar bg-warning" 
+                             role="progressbar" 
+                             style="width: {% widthratio checkin_stats.pending_checkin ticket_stats.total_sold 100 %}%" 
+                             aria-valuenow="{% widthratio checkin_stats.pending_checkin ticket_stats.total_sold 100 %}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {{ checkin_stats.pending_checkin }} Pending
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <small class="text-muted">
+                            {{ checkin_stats.total_checked }} out of {{ ticket_stats.total_sold }} attendees have checked in
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Sales Chart
+    const salesCtx = document.getElementById('salesChart').getContext('2d');
+    new Chart(salesCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for item in daily_sales %}'{{ item.date|date:"M d" }}',{% endfor %}],
+            datasets: [{
+                label: 'Tickets Sold',
+                data: [{% for item in daily_sales %}{{ item.count }},{% endfor %}],
+                backgroundColor: 'rgba(0, 123, 255, 0.5)',
+                borderColor: '#007bff',
+                borderWidth: 1
+            }, {
+                label: 'Revenue',
+                data: [{% for item in daily_sales %}{{ item.revenue }},{% endfor %}],
+                type: 'line',
+                borderColor: '#28a745',
+                borderWidth: 2,
+                fill: false,
+                yAxisID: 'revenue'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Tickets Sold'
+                    }
+                },
+                revenue: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Revenue (Rs.)'
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

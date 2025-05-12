@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Download Ticket - {{ ticket.tier.event.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        .print-only {
+            display: block !important;
+        }
+        .container {
+            width: 100% !important;
+            max-width: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+    }
+    .ticket-container {
+        border: 2px solid #007bff;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+        background-color: #fff;
+        position: relative;
+        overflow: hidden;
+    }
+    .ticket-header {
+        background-color: #007bff;
+        color: white;
+        margin: -20px -20px 20px -20px;
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+    }
+    .ticket-info {
+        margin-bottom: 20px;
+    }
+    .qr-code-container {
+        text-align: center;
+        margin: 20px 0;
+    }
+    .qr-code-container img {
+        max-width: 200px;
+        height: auto;
+    }
+    .ticket-footer {
+        margin-top: 20px;
+        font-size: 0.9em;
+        color: #6c757d;
+        text-align: center;
+    }
+    .watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-45deg);
+        font-size: 100px;
+        opacity: 0.1;
+        color: #007bff;
+        white-space: nowrap;
+        pointer-events: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="ticket-container">
+                <div class="watermark">VALID TICKET</div>
+                <div class="ticket-header">
+                    <h3 class="mb-0">{{ ticket.tier.event.title }}</h3>
+                </div>
+                
+                <div class="ticket-info">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5>Event Details</h5>
+                            <p><strong>Date:</strong> {{ ticket.tier.event.date|date:"F j, Y" }}</p>
+                            <p><strong>Time:</strong> {{ ticket.tier.event.time|time:"g:i A" }}</p>
+                            <p><strong>Venue:</strong> {{ ticket.tier.event.venue }}</p>
+                            <p><strong>Ticket Type:</strong> {{ ticket.tier.name }}</p>
+                            <p><strong>Ticket Price:</strong> Rs. {{ ticket.tier.price }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="qr-code-container">
+                                {% if ticket.qr_code %}
+                                    <img src="{{ ticket.qr_code.url }}" alt="Ticket QR Code" class="img-fluid">
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ticket-info">
+                    <h5>Ticket Information</h5>
+                    <p><strong>Ticket ID:</strong> {{ ticket.id }}</p>
+                    <p><strong>Ticket Holder:</strong> {{ ticket.user.get_full_name|default:ticket.user.username }}</p>
+                    <p><strong>Purchase Date:</strong> {{ ticket.purchase_date|date:"F j, Y" }}</p>
+                    <p><strong>Status:</strong> {{ ticket.status }}</p>
+                </div>
+
+                <div class="ticket-footer">
+                    <p class="mb-0">This ticket is valid for one-time entry only. Please present this ticket (physical or digital) at the venue.</p>
+                    <p class="mb-1">For any queries, please contact the event organizer.</p>
+                    <small>Generated on {{ ticket.purchase_date|date:"F j, Y g:i A" }}</small>
+                </div>
+            </div>
+
+            <div class="text-center mt-4 no-print">
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="fas fa-print me-2"></i>Print Ticket
+                </button>
+                <a href="{% url 'my_tickets' %}" class="btn btn-outline-secondary ms-2">
+                    <i class="fas fa-arrow-left me-2"></i>Back to My Tickets
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Verify Ticket{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header {% if is_valid %}bg-success{% else %}bg-danger{% endif %} text-white">
+                    <h4 class="card-title mb-0">
+                        {% if is_valid %}
+                            <i class="fas fa-check-circle me-2"></i>Valid Ticket
+                        {% else %}
+                            <i class="fas fa-times-circle me-2"></i>Invalid Ticket
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="ticket-info mb-4">
+                        <h5>Ticket Details</h5>
+                        <p><strong>Event:</strong> {{ ticket.tier.event.title }}</p>
+                        <p><strong>Ticket Type:</strong> {{ ticket.tier.name }}</p>
+                        <p><strong>Ticket ID:</strong> {{ ticket.id }}</p>
+                        <p><strong>Ticket Holder:</strong> {{ ticket.user.get_full_name|default:ticket.user.username }}</p>
+                        <p><strong>Purchase Date:</strong> {{ ticket.purchase_date|date:"F j, Y" }}</p>
+                        <p><strong>Status:</strong> {{ ticket.status }}</p>
+                    </div>
+
+                    {% if not is_valid %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Reason:</strong> {{ reason }}
+                        </div>
+                    {% endif %}
+
+                    {% if is_valid %}
+                        <form method="post" class="mt-4">
+                            {% csrf_token %}
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-check-circle me-2"></i>Mark as Used
+                                </button>
+                            </div>
+                        </form>
+                    {% endif %}
+
+                    <div class="mt-4">
+                        <a href="{% url 'scan_ticket' %}" class="btn btn-primary">
+                            <i class="fas fa-qrcode me-2"></i>Scan Another Ticket
+                        </a>
+                        <a href="{% url 'event_detail' ticket.tier.event.id %}" class="btn btn-outline-secondary ms-2">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Event
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% load event_filters %}
+
+{% block title %}Events - Event Management System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Events</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            {% if user.is_authenticated %}
+                <a href="{% url 'create_event' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Event
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Search and Filter Section -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <input type="text" name="q" class="form-control" placeholder="Search events..." value="{{ request.GET.q }}">
+                        <button class="btn btn-outline-primary" type="submit">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <select name="category" class="form-select" onchange="this.form.submit()">
+                        <option value="">All Categories</option>
+                        {% for category in 'MUSIC,EDUCATION,SPORTS,COMMUNITY,OTHER'|split:',' %}
+                            <option value="{{ category }}" {% if request.GET.category == category %}selected{% endif %}>
+                                {{ category|title }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if request.GET.q or request.GET.category %}
+                    <div class="col-md-2">
+                        <a href="{% url 'event_list' %}" class="btn btn-outline-secondary w-100">
+                            Clear Filters
+                        </a>
+                    </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Events Grid -->
+    <div class="row">
+        {% for event in events %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    {% if event.image %}
+                        <img src="{{ event.image.url }}" class="card-img-top" alt="{{ event.title }}" style="height: 200px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ event.title }}</h5>
+                        <p class="card-text">{{ event.description|truncatewords:20 }}</p>
+                        <div class="mb-2">
+                            <span class="badge bg-primary">{{ event.category }}</span>
+                            {% if event.is_past_event %}
+                                <span class="badge bg-secondary">Past Event</span>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar"></i> {{ event.date|date:"M d, Y" }}
+                            </small>
+                            <small class="text-muted">
+                                <i class="fas fa-clock"></i> {{ event.time|time:"g:i A" }}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-grid">
+                            <a href="{% url 'event_detail' event_id=event.id %}" class="btn btn-outline-primary">
+                                View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    No events found. {% if user.is_authenticated %}<a href="{% url 'create_event' %}">Create one</a>!{% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if events.has_other_pages %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if events.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ events.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}">
+                            Previous
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Previous</span>
+                    </li>
+                {% endif %}
+
+                {% for num in events.paginator.page_range %}
+                    {% if events.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}">
+                                {{ num }}
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if events.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ events.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}">
+                            Next
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Next</span>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %} 

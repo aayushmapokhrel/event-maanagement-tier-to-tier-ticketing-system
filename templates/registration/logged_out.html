@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Logged Out - Event Management System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Logged Out</h4>
+                </div>
+                <div class="card-body text-center">
+                    <div class="alert alert-success">
+                        <p>You have been successfully logged out.</p>
+                        <p>Thank you for using our service!</p>
+                    </div>
+                    
+                    <a href="{% url 'login' %}" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt me-2"></i>Log In Again
+                    </a>
+                    
+                    <a href="{% url 'home' %}" class="btn btn-secondary">
+                        <i class="fas fa-home me-2"></i>Return to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

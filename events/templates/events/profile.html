@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Profile - {{ user.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-picture-preview {
+        width: 150px;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 50%;
+        margin-bottom: 1rem;
+    }
+    .profile-picture-container {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">Profile Settings</h3>
+            </div>
+            <div class="card-body">
+                <div class="profile-picture-container">
+                    {% if user.userprofile.profile_picture %}
+                        <img src="{{ user.userprofile.profile_picture.url }}" alt="Profile Picture" class="profile-picture-preview" id="profilePicture">
+                    {% else %}
+                        <img src="{% static 'images/default-profile.png' %}" alt="Default Profile Picture" class="profile-picture-preview" id="profilePicture">
+                    {% endif %}
+                </div>
+
+                <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.phone_number|crispy }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.profile_picture|crispy }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.address|crispy }}
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('id_profile_picture').addEventListener('change', function(e) {
+    if (this.files && this.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('profilePicture').src = e.target.result;
+        };
+        reader.readAsDataURL(this.files[0]);
+    }
+});
+</script>
+{% endblock %} 

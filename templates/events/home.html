@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - Event Management System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Hero Section -->
+    <div class="jumbotron bg-light p-5 rounded-3 mb-5">
+        <h1 class="display-4">Welcome to Event Management System</h1>
+        <p class="lead">Discover amazing events or create your own. Buy tickets securely with Khalti payment integration.</p>
+        <hr class="my-4">
+        <p>Join our community of event organizers and attendees.</p>
+        <a class="btn btn-primary btn-lg" href="{% url 'event_list' %}" role="button">Browse Events</a>
+        {% if user.is_authenticated %}
+            <a class="btn btn-success btn-lg" href="{% url 'create_event' %}" role="button">Create Event</a>
+        {% else %}
+            <a class="btn btn-outline-primary btn-lg" href="{% url 'login' %}" role="button">Sign In</a>
+        {% endif %}
+    </div>
+
+    <!-- Featured Events Section -->
+    <section class="mb-5">
+        <h2 class="mb-4">Featured Events</h2>
+        <div class="row">
+            {% for event in featured_events %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        {% if event.image %}
+                            <img src="{{ event.image.url }}" class="card-img-top" alt="{{ event.title }}" style="height: 200px; object-fit: cover;">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ event.title }}</h5>
+                            <p class="card-text">{{ event.description|truncatewords:20 }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-primary">{{ event.category }}</span>
+                                <small class="text-muted">{{ event.date|date:"M d, Y" }}</small>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <a href="{% url 'event_detail' event_id=event.id %}" class="btn btn-outline-primary w-100">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12">
+                    <div class="alert alert-info">No featured events available at the moment.</div>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="mb-5">
+        <h2 class="mb-4">Why Choose Us?</h2>
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-ticket-alt fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title">Multi-tier Ticketing</h5>
+                        <p class="card-text">Flexible ticket options with different pricing tiers to suit your needs.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-qrcode fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title">QR Code Check-in</h5>
+                        <p class="card-text">Easy and secure event check-in with QR code verification.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shield-alt fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title">Secure Payments</h5>
+                        <p class="card-text">Safe and reliable payment processing with Khalti integration.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %} 

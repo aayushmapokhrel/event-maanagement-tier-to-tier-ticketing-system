@@ -1,0 +1,154 @@
+{% extends 'admin_dashboard/base.html' %}
+{% load admin_filters %}
+
+{% block title %}Admin Dashboard - Event Tickets{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Tickets for {{ event.name }}</h6>
+            <a href="{% url 'admin_events' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Events
+            </a>
+        </div>
+        <div class="card-body">
+            <!-- Event Details -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h5>Event Details</h5>
+                    <table class="table">
+                        <tr>
+                            <th>Date:</th>
+                            <td>{{ event.date|date:"Y-m-d" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Venue:</th>
+                            <td>{{ event.venue }}</td>
+                        </tr>
+                        <tr>
+                            <th>Category:</th>
+                            <td>{{ event.category }}</td>
+                        </tr>
+                        <tr>
+                            <th>Organizer:</th>
+                            <td>{{ event.organizer.username }}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h5>Ticket Statistics</h5>
+                    <table class="table">
+                        <tr>
+                            <th>Total Capacity:</th>
+                            <td>{{ event.capacity }}</td>
+                        </tr>
+                        <tr>
+                            <th>Tickets Sold:</th>
+                            <td>{{ tickets.count }}</td>
+                        </tr>
+                        <tr>
+                            <th>Available Tickets:</th>
+                            <td>{{ event.capacity|sub:tickets.count }}</td>
+                        </tr>
+                        <tr>
+                            <th>Total Revenue:</th>
+                            <td>Rs. {{ tickets|sum_ticket_prices }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tickets Table -->
+            <div class="table-responsive">
+                <table class="table table-bordered" id="ticketsTable">
+                    <thead>
+                        <tr>
+                            <th>Ticket ID</th>
+                            <th>Attendee</th>
+                            <th>Tier</th>
+                            <th>Price</th>
+                            <th>Purchase Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in tickets %}
+                        <tr>
+                            <td>{{ ticket.id }}</td>
+                            <td>{{ ticket.user.username }}</td>
+                            <td>{{ ticket.tier.name }}</td>
+                            <td>Rs. {{ ticket.tier.price }}</td>
+                            <td>{{ ticket.purchase_date|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <span class="badge bg-{% if ticket.status == 'valid' %}success{% else %}danger{% endif %}">
+                                    {% if ticket.status == 'valid' %}Valid{% else %}{{ ticket.status|title }}{% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="viewTicketDetails('{{ ticket.id }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="resendTicket('{{ ticket.id }}')">
+                                    <i class="fas fa-envelope"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="cancelTicket('{{ ticket.id }}')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ticket Details Modal -->
+<div class="modal fade" id="ticketDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ticket Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="ticketDetails">
+                    <!-- Ticket details will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function viewTicketDetails(ticketId) {
+        // Implement view ticket details functionality
+        $('#ticketDetailsModal').modal('show');
+    }
+
+    function resendTicket(ticketId) {
+        if (confirm('Are you sure you want to resend the ticket email?')) {
+            // Implement resend ticket functionality
+        }
+    }
+
+    function cancelTicket(ticketId) {
+        if (confirm('Are you sure you want to cancel this ticket?')) {
+            // Implement cancel ticket functionality
+        }
+    }
+
+    // Initialize DataTables
+    $(document).ready(function() {
+        $('#ticketsTable').DataTable();
+    });
+</script>
+{% endblock %} 

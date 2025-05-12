@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Manage Attendees - {{ event.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        color: white;
+    }
+    .stats-card.total {
+        background-color: #007bff;
+    }
+    .stats-card.checked-in {
+        background-color: #28a745;
+    }
+    .stats-card.pending {
+        background-color: #ffc107;
+        color: #212529;
+    }
+    .table-responsive {
+        border-radius: 10px;
+        box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+    .search-box {
+        border-radius: 20px;
+        padding: 10px 20px;
+        border: 1px solid #ced4da;
+    }
+    .export-btn {
+        border-radius: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ event.title }} - Attendee Management</h2>
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle export-btn" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-download me-2"></i>Export
+            </button>
+            <ul class="dropdown-menu">
+                <li>
+                    <a class="dropdown-item" href="?export=csv">
+                        <i class="fas fa-file-csv me-2"></i>Export as CSV
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="?export=excel">
+                        <i class="fas fa-file-excel me-2"></i>Export as Excel
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card total">
+                <h4>Total Tickets</h4>
+                <h2 class="mb-0">{{ stats.total }}</h2>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card checked-in">
+                <h4>Checked In</h4>
+                <h2 class="mb-0">{{ stats.checked_in }}</h2>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card pending">
+                <h4>Pending Check-in</h4>
+                <h2 class="mb-0">{{ stats.pending }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <input type="text" id="attendeeSearch" class="form-control search-box w-auto" placeholder="Search attendees...">
+                <a href="{% url 'checkin_dashboard' event.id %}" class="btn btn-outline-primary">
+                    <i class="fas fa-chart-line me-2"></i>Check-in Dashboard
+                </a>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover" id="attendeeTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Ticket ID</th>
+                            <th>Attendee Name</th>
+                            <th>Email</th>
+                            <th>Ticket Type</th>
+                            <th>Purchase Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in tickets %}
+                        <tr>
+                            <td>{{ ticket.id }}</td>
+                            <td>{{ ticket.user.get_full_name|default:ticket.user.username }}</td>
+                            <td>{{ ticket.user.email }}</td>
+                            <td>{{ ticket.tier.name }}</td>
+                            <td>{{ ticket.purchase_date|date:"M d, Y H:i" }}</td>
+                            <td>
+                                <span class="badge {% if ticket.status == 'USED' %}bg-success{% elif ticket.status == 'SOLD' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ ticket.status }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if ticket.status == 'SOLD' %}
+                                <a href="{% url 'verify_ticket' ticket.id %}" class="btn btn-sm btn-success">
+                                    <i class="fas fa-check me-1"></i>Check In
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('attendeeSearch');
+    const table = document.getElementById('attendeeTable');
+    const rows = table.getElementsByTagName('tr');
+
+    searchInput.addEventListener('keyup', function(e) {
+        const term = e.target.value.toLowerCase();
+        
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(term) ? '' : 'none';
+        }
+    });
+});
+</script>
+{% endblock %} 
