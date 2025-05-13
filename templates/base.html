@@ -38,7 +38,7 @@
                                 <li><a class="dropdown-item" href="{% url 'profile' %}">Profile</a></li>
                                 <li><a class="dropdown-item" href="{% url 'my_tickets' %}">My Tickets</a></li>
                                 {% if user.is_staff %}
-                                    <li><a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a></li>
+                                    <li><a class="dropdown-item" href="{% url 'admin_dashboard' %}">Admin</a></li>
                                 {% endif %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
@@ -92,7 +92,7 @@
                 </div>
                 <div class="col-md-6 text-md-end">
                     <h5>Contact Us</h5>
-                    <p>Email: support@eventmanagement.com<br>Phone: +1 234 567 890</p>
+                    <p>Email: support@eventmanagement.com<br>Phone: 9813553937</p>
                 </div>
             </div>
             <div class="text-center mt-3">

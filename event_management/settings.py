@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -138,17 +140,16 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Khalti Configuration
-KHALTI_SECRET_KEY = 'ea50db2d30384463b36fd60e661d6681'
-KHALTI_PUBLIC_KEY = '94130ddfdd4948b9b908d99179579053'
+KHALTI_SECRET_KEY = os.getenv('KHALTI_SECRET_KEY')
+KHALTI_PUBLIC_KEY = os.getenv('KHALTI_PUBLIC_KEY')
 
 # Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'pokharelaayushma02@gmail.com'
-EMAIL_HOST_PASSWORD = 'tkhs kmkh ykkr poao'
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+EMAIL_PORT = 587
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
 # Authentication settings
 LOGIN_REDIRECT_URL = 'home'
