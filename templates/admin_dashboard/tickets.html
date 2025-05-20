@@ -21,6 +21,7 @@
                             <th>User</th>
                             <th>Purchase Date</th>
                             <th>Price</th>
+                            <th>Quantity</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -34,6 +35,7 @@
                             <td>{{ ticket.user.username }}</td>
                             <td>{{ ticket.purchase_date|date:"Y-m-d H:i" }}</td>
                             <td>Rs. {{ ticket.tier.price }}</td>
+                            <td>{{ ticket.quantity }}</td>
                             <td>
                                 <span class="badge bg-{% if ticket.status == 'SOLD' %}success{% elif ticket.status == 'PENDING' %}warning{% elif ticket.status == 'USED' %}info{% else %}danger{% endif %}">
                                     {{ ticket.status }}
@@ -96,6 +98,7 @@
                             <th>Price:</th>
                             <td id="ticket_price"></td>
                         </tr>
+                       
                         <tr>
                             <th>Status:</th>
                             <td id="ticket_status"></td>

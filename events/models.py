@@ -7,6 +7,7 @@ import qrcode
 from io import BytesIO
 from django.core.files import File
 from PIL import Image, ImageDraw
+from django.db.models import Sum
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -62,6 +63,16 @@ class Event(models.Model):
             timezone.datetime.combine(self.date, self.time)
         )
         return event_datetime < timezone.now()
+        
+    @property
+    def total_tickets_sold(self):
+        """Calculate total number of tickets sold for this event, considering quantity"""
+        return Ticket.objects.filter(
+            tier__event=self,
+            status='SOLD'
+        ).aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
 
 class TicketTier(models.Model):
     TIER_CHOICES = [
@@ -81,8 +92,16 @@ class TicketTier(models.Model):
     
     @property
     def available_tickets(self):
-        sold = self.tickets.filter(status='SOLD').count()
+        sold = self.tickets.filter(status='SOLD').aggregate(
+            total_sold=models.Sum('quantity')
+        )['total_sold'] or 0
         return self.quantity - sold
+    
+    def decrease_available_tickets(self, quantity):
+        """Decrease available tickets when tickets are purchased"""
+        if self.available_tickets >= quantity:
+            return True
+        return False
 
 class Ticket(models.Model):
     STATUS_CHOICES = [
@@ -100,6 +119,7 @@ class Ticket(models.Model):
     payment_id = models.CharField(max_length=100, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     check_in_time = models.DateTimeField(null=True, blank=True)
+    quantity = models.PositiveIntegerField(default=1)
     
     def __str__(self):
         return f"{self.tier.event.title} - {self.tier.name} - {self.user.username}"

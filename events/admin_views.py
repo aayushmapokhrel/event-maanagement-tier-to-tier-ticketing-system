@@ -20,11 +20,19 @@ def admin_dashboard(request):
     # Get statistics
     total_users = User.objects.count()
     active_events = Event.objects.filter(date__gte=timezone.now()).count()
-    tickets_sold = Ticket.objects.count()
     
-    # Calculate total revenue by joining Ticket with TicketTier
-    total_revenue = Ticket.objects.select_related('tier').aggregate(
-        total=Sum('tier__price')
+    # Get total tickets sold (considering quantity)
+    tickets_sold = Ticket.objects.filter(
+        status='SOLD'
+    ).aggregate(
+        total=Sum('quantity')
+    )['total'] or 0
+    
+    # Calculate total revenue (price * quantity)
+    total_revenue = Ticket.objects.filter(
+        status='SOLD'
+    ).select_related('tier').aggregate(
+        total=Sum(F('tier__price') * F('quantity'))
     )['total'] or 0
 
     # Get revenue data for the last 7 days
@@ -37,7 +45,7 @@ def admin_dashboard(request):
             purchase_date__date=date,
             status='SOLD'
         ).select_related('tier').aggregate(
-            total=Sum('tier__price')
+            total=Sum(F('tier__price') * F('quantity'))
         )['total'] or 0
         revenue_data.append(float(daily_revenue))
         revenue_labels.append(date.strftime('%b %d'))
@@ -56,7 +64,7 @@ def admin_dashboard(request):
     recent_tickets = Ticket.objects.select_related('user', 'tier', 'tier__event').order_by('-purchase_date')[:5]
     for ticket in recent_tickets:
         recent_activities.append({
-            'description': f'Ticket purchased for {ticket.tier.event.title} ({ticket.tier.name})',
+            'description': f'{ticket.quantity} ticket(s) purchased for {ticket.tier.event.title} ({ticket.tier.name})',
             'user': ticket.user.username,
             'date': ticket.purchase_date,
             'status': 'Completed',
@@ -100,8 +108,17 @@ def admin_users(request):
 
 @staff_member_required
 def admin_events(request):
-    events = Event.objects.select_related('organizer').all()
-    return render(request, 'admin_dashboard/events.html', {'events': events})
+    # Get all events with optimized query
+    events = Event.objects.select_related('organizer').prefetch_related(
+        'ticket_tiers__tickets'
+    ).all()
+    
+    # Add today's date to context for status comparison
+    context = {
+        'events': events,
+        'today': timezone.now().date()
+    }
+    return render(request, 'admin_dashboard/events.html', context)
 
 @staff_member_required
 def admin_tickets(request):

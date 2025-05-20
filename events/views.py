@@ -158,20 +158,30 @@ def purchase_ticket(request, tier_id):
     ticket_tier = get_object_or_404(TicketTier, id=tier_id)
     
     if request.method == 'POST':
-        if ticket_tier.available_tickets <= 0:
-            messages.error(request, 'Sorry, this ticket tier is sold out!')
+        quantity = int(request.POST.get('quantity', 1))
+        
+        if quantity <= 0 or quantity > ticket_tier.available_tickets:
+            messages.error(request, 'Invalid quantity selected.')
+            return redirect('event_detail', event_id=ticket_tier.event.id)
+        
+        if ticket_tier.available_tickets < quantity:
+            messages.error(request, 'Sorry, not enough tickets available!')
             return redirect('event_detail', event_id=ticket_tier.event.id)
         
         try:
-            # Create a pending ticket
+            # Create a single ticket with quantity
             ticket = Ticket.objects.create(
                 tier=ticket_tier,
                 user=request.user,
-                status='PENDING'
+                status='PENDING',
+                quantity=quantity
             )
             
+            # Calculate total amount
+            total_amount = ticket_tier.price * quantity
+            
             # Convert price to paisa (Khalti uses paisa)
-            amount_in_paisa = int(ticket_tier.price * 100)
+            amount_in_paisa = int(total_amount * 100)
             
             # Prepare Khalti payment
             payload = {
@@ -179,7 +189,7 @@ def purchase_ticket(request, tier_id):
                 'website_url': request.build_absolute_uri('/'),
                 'amount': amount_in_paisa,
                 'purchase_order_id': str(ticket.id),
-                'purchase_order_name': f'Ticket for {ticket_tier.event.title}',
+                'purchase_order_name': f'{quantity} Ticket(s) for {ticket_tier.event.title}',
                 'customer_info': {
                     'name': request.user.get_full_name() or request.user.username,
                     'email': request.user.email,
@@ -276,16 +286,19 @@ def verify_payment(request, ticket_id):
         if response.status_code == 200:
             status = response_data.get('status')
             if status == 'Completed':
+                # Check if enough tickets are still available
+                if not ticket.tier.decrease_available_tickets(ticket.quantity):
+                    messages.error(request, 'Sorry, not enough tickets available now.')
+                    ticket.status = 'CANCELLED'
+                    ticket.save()
+                    return redirect('event_detail', event_id=ticket.tier.event.id)
+                
                 # Update ticket status and details
                 ticket.status = 'SOLD'
                 ticket.payment_id = pidx
                 
                 # Save the ticket (this will trigger QR code generation)
                 ticket.save()
-                
-                # Decrease available tickets count
-                ticket.tier.available_tickets = F('available_tickets') - 1
-                ticket.tier.save()
                 
                 # Send confirmation email
                 subject = f'Ticket Confirmation - {ticket.tier.event.title}'
@@ -515,18 +528,28 @@ def organizer_dashboard(request):
     # Get overall statistics
     total_events = events.count()
     active_events = events.filter(is_active=True).count()
-    total_tickets = Ticket.objects.filter(tier__event__organizer=request.user).count()
+    
+    # Get total tickets sold (considering quantity)
+    total_tickets = Ticket.objects.filter(
+        tier__event__organizer=request.user,
+        status='SOLD'
+    ).aggregate(
+        total=Sum('quantity')
+    )['total'] or 0
+    
+    # Calculate total revenue (price * quantity)
     total_revenue = Ticket.objects.filter(
         tier__event__organizer=request.user,
         status='SOLD'
     ).aggregate(
-        total=Sum('tier__price')
+        total=Sum(F('tier__price') * F('quantity'))
     )['total'] or 0
     
     # Get ticket sales by event
     event_sales = events.annotate(
-        tickets_sold=Count('ticket_tiers__tickets', filter=Q(ticket_tiers__tickets__status='SOLD')),
-        revenue=Sum('ticket_tiers__tickets__tier__price', filter=Q(ticket_tiers__tickets__status='SOLD'))
+        tickets_sold=Sum('ticket_tiers__tickets__quantity', filter=Q(ticket_tiers__tickets__status='SOLD')),
+        revenue=Sum(F('ticket_tiers__tickets__tier__price') * F('ticket_tiers__tickets__quantity'), 
+                   filter=Q(ticket_tiers__tickets__status='SOLD'))
     )
     
     # Get daily sales for the last 30 days
@@ -538,8 +561,8 @@ def organizer_dashboard(request):
     ).annotate(
         date=TruncDate('purchase_date')
     ).values('date').annotate(
-        count=Count('id'),
-        revenue=Sum('tier__price')
+        count=Sum('quantity'),
+        revenue=Sum(F('tier__price') * F('quantity'))
     ).order_by('date')
     
     # Get monthly revenue
@@ -549,15 +572,16 @@ def organizer_dashboard(request):
     ).annotate(
         month=TruncMonth('purchase_date')
     ).values('month').annotate(
-        revenue=Sum('tier__price')
+        revenue=Sum(F('tier__price') * F('quantity'))
     ).order_by('month')
     
     # Get ticket type distribution
     ticket_types = TicketTier.objects.filter(
         event__organizer=request.user
     ).values('name').annotate(
-        count=Count('tickets', filter=Q(tickets__status='SOLD')),
-        revenue=Sum('tickets__tier__price', filter=Q(tickets__status='SOLD'))
+        count=Sum('tickets__quantity', filter=Q(tickets__status='SOLD')),
+        revenue=Sum(F('tickets__tier__price') * F('tickets__quantity'), 
+                   filter=Q(tickets__status='SOLD'))
     )
     
     # Get recent transactions

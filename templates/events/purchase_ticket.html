@@ -36,30 +36,45 @@
                         <p>{{ ticket_tier.description }}</p>
                     </div>
 
-                    <form method="post" id="payment-form">
-                        {% csrf_token %}
-                        <div class="mb-3">
-                            <label class="form-label">Payment Method</label>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-credit-card"></i> Pay with Khalti
-                                </button>
+                    {% if ticket_tier.available_tickets > 0 %}
+                        <form method="post" class="mt-4">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">Quantity:</label>
+                                <input type="number" name="quantity" id="quantity" class="form-control" min="1" max="{{ ticket_tier.available_tickets }}" value="1" required onchange="updateTotal()">
                             </div>
+                            <div class="mb-3">
+                                <label for="total" class="form-label">Total Amount:</label>
+                                <input type="text" id="total" class="form-control" readonly value="Rs. {{ ticket_tier.price }}">
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-shopping-cart me-2"></i>Proceed to Payment
+                                </button>
+                                <a href="{% url 'event_detail' ticket_tier.event.id %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Back to Event
+                                </a>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Sorry, this ticket tier is sold out!
                         </div>
-                    </form>
-
-                    <div class="mt-4">
-                        <h5>Important Notes:</h5>
-                        <ul>
-                            <li>Tickets are non-refundable</li>
-                            <li>You will receive an email confirmation after successful payment</li>
-                            <li>The QR code in your ticket will be used for event check-in</li>
-                            <li>Please arrive at least 30 minutes before the event starts</li>
-                        </ul>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateTotal() {
+    const quantity = document.getElementById('quantity').value;
+    const price = {{ ticket_tier.price }};
+    const total = quantity * price;
+    document.getElementById('total').value = `Rs. ${total}`;
+}
+</script>
 {% endblock %} 
