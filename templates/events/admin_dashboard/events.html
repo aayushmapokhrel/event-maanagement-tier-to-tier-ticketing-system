@@ -34,7 +34,7 @@
                             <td>{{ event.organizer.username }}</td>
                             <td>{{ event.date|date:"Y-m-d" }}</td>
                             <td>{{ event.category }}</td>
-                            <td>{{ event.total_tickets_sold }}</td>
+                            <td>{{ event|total_tickets_sold }}</td>
                             <td>
                                 <span class="badge bg-{% if event.date >= today %}primary{% else %}secondary{% endif %}">
                                     {% if event.date >= today %}Upcoming{% else %}Past{% endif %}

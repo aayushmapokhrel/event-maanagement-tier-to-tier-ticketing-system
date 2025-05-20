@@ -3,11 +3,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Count, Sum, F
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from .models import Event, Ticket, Review, UserProfile, TicketTier
 from django.contrib.auth.models import User
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 import json
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
@@ -34,12 +34,13 @@ def admin_dashboard(request):
     
     for date in reversed(last_7_days):
         daily_revenue = Ticket.objects.filter(
-            purchase_date__date=date
+            purchase_date__date=date,
+            status='SOLD'
         ).select_related('tier').aggregate(
             total=Sum('tier__price')
         )['total'] or 0
-        revenue_data.append(daily_revenue)
-        revenue_labels.append(date.strftime('%Y-%m-%d'))
+        revenue_data.append(float(daily_revenue))
+        revenue_labels.append(date.strftime('%b %d'))
 
     # Get event categories distribution
     categories = Event.objects.values('category').annotate(
@@ -77,15 +78,16 @@ def admin_dashboard(request):
     recent_activities.sort(key=lambda x: x['date'], reverse=True)
     recent_activities = recent_activities[:10]
 
+    # Convert data to JSON-safe format
     context = {
         'total_users': total_users,
         'active_events': active_events,
         'tickets_sold': tickets_sold,
         'total_revenue': total_revenue,
-        'revenue_data': revenue_data,
-        'revenue_labels': revenue_labels,
-        'category_labels': category_labels,
-        'category_data': category_data,
+        'revenue_data': json.dumps(revenue_data),
+        'revenue_labels': json.dumps(revenue_labels),
+        'category_labels': json.dumps(category_labels),
+        'category_data': json.dumps(category_data),
         'recent_activities': recent_activities,
     }
 
@@ -273,18 +275,30 @@ def delete_user(request, user_id):
 @require_POST
 def add_event(request):
     try:
-        title = request.POST.get('name')  # Keep 'name' in form for backward compatibility
+        # Get form data
+        title = request.POST.get('name')
         category = request.POST.get('category')
-        date = request.POST.get('date')
         venue = request.POST.get('venue')
         capacity = request.POST.get('capacity')
         description = request.POST.get('description')
         image = request.FILES.get('image')
 
+        # Handle date and time separately
+        date_str = request.POST.get('date')
+        time_str = request.POST.get('time')
+        if not date_str or not time_str:
+            return JsonResponse({'error': 'Date and time are required'}, status=400)
+
+        from datetime import datetime
+        event_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        event_time = datetime.strptime(time_str, '%H:%M').time()
+
+        # Create event
         event = Event.objects.create(
             title=title,
             category=category,
-            date=date,
+            date=event_date,
+            time=event_time,
             venue=venue,
             capacity=capacity,
             description=description,
@@ -305,13 +319,22 @@ def update_event(request, event_id):
     try:
         event = get_object_or_404(Event, id=event_id)
         
-        event.title = request.POST.get('name', event.title)  # Keep 'name' in form for backward compatibility
+        # Get form data
+        event.title = request.POST.get('name', event.title)
         event.category = request.POST.get('category', event.category)
-        event.date = request.POST.get('date', event.date)
         event.venue = request.POST.get('venue', event.venue)
         event.capacity = request.POST.get('capacity', event.capacity)
         event.description = request.POST.get('description', event.description)
+        
+        # Handle date and time separately
+        date_str = request.POST.get('date')
+        time_str = request.POST.get('time')
+        if date_str and time_str:
+            from datetime import datetime
+            event.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            event.time = datetime.strptime(time_str, '%H:%M').time()
 
+        # Handle image upload
         if 'image' in request.FILES:
             event.image = request.FILES['image']
 
@@ -338,6 +361,30 @@ def event_tickets(request, event_id):
         'event': event,
         'tickets': tickets
     })
+
+@staff_member_required
+@require_GET
+def get_ticket_details(request, ticket_id):
+    try:
+        ticket = get_object_or_404(Ticket, id=ticket_id)
+        ticket_data = {
+            'id': ticket.id,
+            'tier': {
+                'name': ticket.tier.name,
+                'price': float(ticket.tier.price),
+                'event': {
+                    'title': ticket.tier.event.title
+                }
+            },
+            'user': {
+                'username': ticket.user.username
+            },
+            'purchase_date': ticket.purchase_date.isoformat(),
+            'status': ticket.status
+        }
+        return JsonResponse(ticket_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
 @staff_member_required
 @require_POST
@@ -401,6 +448,28 @@ def cancel_ticket(request, ticket_id):
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 @staff_member_required
+@require_GET
+def get_review_details(request, review_id):
+    try:
+        review = get_object_or_404(Review, id=review_id)
+        review_data = {
+            'id': review.id,
+            'event': {
+                'title': review.event.title
+            },
+            'user': {
+                'username': review.user.username
+            },
+            'rating': review.rating,
+            'comment': review.comment,
+            'created_at': review.created_at.isoformat(),
+            'is_approved': review.is_approved
+        }
+        return JsonResponse(review_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@staff_member_required
 @require_POST
 def approve_review(request, review_id):
     try:
@@ -443,4 +512,66 @@ def resend_receipt(request, payment_id):
         
         return JsonResponse({'success': True, 'message': 'Payment receipt resent successfully'})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400) 
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+@staff_member_required
+@require_GET
+def get_user_details(request, user_id):
+    try:
+        user = get_object_or_404(User, id=user_id)
+        user_data = {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'is_staff': user.is_staff,
+            'is_superuser': user.is_superuser,
+            'is_active': user.is_active
+        }
+        return JsonResponse(user_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@staff_member_required
+@require_GET
+def get_event_details(request, event_id):
+    try:
+        event = get_object_or_404(Event, id=event_id)
+        event_data = {
+            'id': event.id,
+            'title': event.title,
+            'date': event.date.strftime('%Y-%m-%d'),
+            'venue': event.venue,
+            'description': event.description,
+            'category': event.category,
+            'capacity': event.capacity,
+            'image_url': event.image.url if event.image else None
+        }
+        return JsonResponse(event_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@staff_member_required
+@require_GET
+def get_payment_details(request, payment_id):
+    try:
+        ticket = get_object_or_404(Ticket, id=payment_id)
+        payment_data = {
+            'id': ticket.id,
+            'payment_id': ticket.payment_id,
+            'tier': {
+                'name': ticket.tier.name,
+                'price': float(ticket.tier.price),
+                'event': {
+                    'title': ticket.tier.event.title
+                }
+            },
+            'user': {
+                'username': ticket.user.username
+            },
+            'purchase_date': ticket.purchase_date.isoformat(),
+            'status': ticket.status,
+            'transaction_id': ticket.transaction_id
+        }
+        return JsonResponse(payment_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400) 

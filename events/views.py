@@ -56,7 +56,6 @@ def profile(request):
         form = UserProfileForm(instance=profile)
     
     return render(request, 'events/profile.html', {'form': form})
-
 def event_list(request):
     # Start with ordered queryset
     events = Event.objects.filter(is_active=True).order_by('-date', '-time', 'title')

@@ -169,14 +169,14 @@
                 </div>
             </div>
 
-            <!-- Similar Events -->
-            <div class="card">
+             <!-- Similar Events -->
+             <div class="card mt-4">
                 <div class="card-header">
                     <h5 class="mb-0">Similar Events</h5>
                 </div>
                 <div class="card-body">
-                    {% for similar_event in event.category.events.all|slice:":3" %}
-                        {% if similar_event != event %}
+                    {% with similar_events=event.get_similar_events %}
+                        {% for similar_event in similar_events %}
                             <div class="mb-3">
                                 <h6>
                                     <a href="{% url 'event_detail' event_id=similar_event.id %}" class="text-decoration-none">
@@ -187,8 +187,10 @@
                                     <i class="fas fa-calendar"></i> {{ similar_event.date|date:"M d, Y" }}
                                 </small>
                             </div>
-                        {% endif %}
-                    {% endfor %}
+                        {% empty %}
+                            <p class="text-muted">No similar events found.</p>
+                        {% endfor %}
+                    {% endwith %}
                 </div>
             </div>
         </div>

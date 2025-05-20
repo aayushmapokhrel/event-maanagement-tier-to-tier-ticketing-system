@@ -2,11 +2,212 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}Profile Test - {{ user.username }}{% endblock %}
+{% block title %}Profile - {{ user.username }}{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>Test Template</h1>
-    <p>If you can see this, the template is being found.</p>
+<div class="container py-5">
+    <div class="row">
+        <!-- Profile Information Card -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    {% if user.userprofile.profile_picture %}
+                        <img src="{{ user.userprofile.profile_picture.url }}" alt="Profile Picture" class="rounded-circle img-fluid mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    {% else %}
+                        <img src="{% static 'images/default-profile.png' %}" alt="Default Profile Picture" class="rounded-circle img-fluid mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    {% endif %}
+                    <h3 class="card-title">{{ user.get_full_name|default:user.username }}</h3>
+                    <p class="text-muted">Member since {{ user.date_joined|date:"F Y" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Edit Forms -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-4" id="profileTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="personal-tab" data-bs-toggle="tab" href="#personal" role="tab">Personal Information</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="email-tab" data-bs-toggle="tab" href="#email" role="tab">Email Settings</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="password-tab" data-bs-toggle="tab" href="#password" role="tab">Change Password</a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="profileTabsContent">
+                        <!-- Personal Information Tab -->
+                        <div class="tab-pane fade show active" id="personal" role="tabpanel">
+                            <form method="post" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <input type="hidden" name="form_type" value="profile">
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">First Name</label>
+                                        <input type="text" name="first_name" class="form-control" value="{{ user.first_name }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Last Name</label>
+                                        <input type="text" name="last_name" class="form-control" value="{{ user.last_name }}">
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Phone Number</label>
+                                    <input type="tel" name="phone_number" class="form-control" value="{{ user.userprofile.phone_number }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Address</label>
+                                    <textarea name="address" class="form-control" rows="3">{{ user.userprofile.address }}</textarea>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Profile Picture</label>
+                                    <input type="file" name="profile_picture" class="form-control" accept="image/*">
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">Update Profile</button>
+                            </form>
+                        </div>
+
+                        <!-- Email Settings Tab -->
+                        <div class="tab-pane fade" id="email" role="tabpanel">
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="form_type" value="email">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Current Email</label>
+                                    <input type="email" class="form-control" value="{{ user.email }}" readonly>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">New Email</label>
+                                    <input type="email" name="new_email" class="form-control" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Current Password</label>
+                                    <input type="password" name="current_password" class="form-control" required>
+                                    <small class="text-muted">Required to verify your identity</small>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">Change Email</button>
+                            </form>
+                        </div>
+
+                        <!-- Password Change Tab -->
+                        <div class="tab-pane fade" id="password" role="tabpanel">
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="form_type" value="password">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Current Password</label>
+                                    <input type="password" name="old_password" class="form-control" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">New Password</label>
+                                    <input type="password" name="new_password1" class="form-control" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Confirm New Password</label>
+                                    <input type="password" name="new_password2" class="form-control" required>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">Change Password</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User's Activity Section -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-pills mb-3" id="activityTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="tickets-tab" data-bs-toggle="pill" href="#tickets" role="tab">My Tickets</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="events-tab" data-bs-toggle="pill" href="#events" role="tab">My Events</a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="activityTabsContent">
+                        <!-- Tickets Tab -->
+                        <div class="tab-pane fade show active" id="tickets" role="tabpanel">
+                            {% if user_tickets %}
+                                <div class="list-group">
+                                    {% for ticket in user_tickets %}
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">{{ ticket.tier.event.title }}</h6>
+                                                <small>{{ ticket.purchase_date|date:"M d, Y" }}</small>
+                                            </div>
+                                            <p class="mb-1">{{ ticket.tier.name }} - {{ ticket.status }}</p>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No tickets purchased yet.</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Events Tab -->
+                        <div class="tab-pane fade" id="events" role="tabpanel">
+                            {% if user_events %}
+                                <div class="list-group">
+                                    {% for event in user_events %}
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">{{ event.title }}</h6>
+                                                <small>{{ event.date|date:"M d, Y" }}</small>
+                                            </div>
+                                            <p class="mb-1">{{ event.venue }}</p>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No events organized yet.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Show success message after form submission
+    {% if messages %}
+        {% for message in messages %}
+            alert("{{ message }}");
+        {% endfor %}
+    {% endif %}
+
+    // Preview profile picture before upload
+    document.querySelector('input[name="profile_picture"]').addEventListener('change', function(e) {
+        if (e.target.files && e.target.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.querySelector('.rounded-circle').src = e.target.result;
+            }
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    });
+</script>
 {% endblock %} 
