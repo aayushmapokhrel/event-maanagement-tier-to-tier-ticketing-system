@@ -139,9 +139,16 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# # Khalti Configuration
+# KHALTI_SECRET_KEY = os.getenv('KHALTI_SECRET_KEY')
+# KHALTI_PUBLIC_KEY = os.getenv('KHALTI_PUBLIC_KEY')
+
+# settings.py
+
 # Khalti Configuration
-KHALTI_SECRET_KEY = os.getenv('KHALTI_SECRET_KEY')
-KHALTI_PUBLIC_KEY = os.getenv('KHALTI_PUBLIC_KEY')
+KHALTI_SECRET_KEY = os.getenv('KHALTI_SECRET_KEY', 'test_secret_key_...')  # Default for development
+KHALTI_PUBLIC_KEY = os.getenv('KHALTI_PUBLIC_KEY', 'test_public_key_...')  # Default for development
+KHALTI_MODE = os.getenv('KHALTI_MODE', 'test')  # 'test' or 'live'
 
 # Email Configuration
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

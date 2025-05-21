@@ -1,80 +1,35 @@
+<!-- templates/emails/ticket_confirmation.html -->
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Ticket Confirmation - {{ ticket.tier.event.title }}</title>
+    <title>Ticket Confirmation - {{ event.title }}</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
+        .ticket-info {
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            margin: 15px 0;
+            background-color: #f9f9f9;
         }
-        .header {
-            text-align: center;
-            padding: 20px 0;
-            border-bottom: 2px solid #007bff;
-        }
-        .ticket-details {
-            background-color: #f8f9fa;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 5px;
-        }
-        .qr-code {
-            text-align: center;
-            margin: 20px 0;
-        }
-        .footer {
-            text-align: center;
-            padding: 20px 0;
-            border-top: 1px solid #dee2e6;
-            margin-top: 20px;
-            font-size: 0.9em;
-            color: #6c757d;
+        .ticket-detail {
+            margin: 5px 0;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Ticket Confirmation</h1>
-        <p>Thank you for your purchase!</p>
+    <h2>Thank you for your purchase, {{ user.username }}!</h2>
+    <p>Here are your ticket details:</p>
+    
+    <div class="ticket-info">
+        <h3>{{ event.title }}</h3>
+        <div class="ticket-detail"><strong>Ticket Type:</strong> {{ tier_name }}</div>
+        <div class="ticket-detail"><strong>Quantity:</strong> {{ quantity }}</div>
+        <div class="ticket-detail"><strong>Total Paid:</strong> Rs. {{ total_price|floatformat:2 }}</div>
+        <div class="ticket-detail"><strong>Event Date:</strong> {{ event.date }} at {{ event.time }}</div>
+        <div class="ticket-detail"><strong>Venue:</strong> {{ event.venue }}</div>
     </div>
-
-    <div class="ticket-details">
-        <h2>Event Details</h2>
-        <p><strong>Event:</strong> {{ ticket.tier.event.title }}</p>
-        <p><strong>Date:</strong> {{ ticket.tier.event.date|date:"F d, Y" }}</p>
-        <p><strong>Time:</strong> {{ ticket.tier.event.time|time:"g:i A" }}</p>
-        <p><strong>Venue:</strong> {{ ticket.tier.event.venue }}</p>
-        
-        <h2>Ticket Information</h2>
-        <p><strong>Ticket Type:</strong> {{ ticket.tier.name }}</p>
-        <p><strong>Ticket ID:</strong> {{ ticket.id }}</p>
-        <p><strong>Purchase Date:</strong> {{ ticket.purchase_date|date:"F d, Y" }}</p>
-    </div>
-
-    <div class="qr-code">
-        <h2>Entry QR Code</h2>
-        <img src="{{ ticket.qr_code.url }}" alt="Ticket QR Code" style="max-width: 200px;">
-        <p>Please present this QR code at the event entrance for check-in.</p>
-    </div>
-
-    <div class="important-info">
-        <h2>Important Information</h2>
-        <ul>
-            <li>This ticket is valid for one-time entry only.</li>
-            <li>Please arrive at least 30 minutes before the event starts.</li>
-            <li>Bring a valid ID that matches the name on the ticket.</li>
-            <li>This ticket is non-transferable and non-refundable.</li>
-        </ul>
-    </div>
-
-    <div class="footer">
-        <p>If you have any questions, please contact us at support@eventmanagement.com</p>
-        <p>&copy; {% now "Y" %} Event Management System. All rights reserved.</p>
-    </div>
+    
+    <p>You can view and download your tickets at any time from your <a href="{{ my_tickets_url }}">account page</a>.</p>
+    
+    <p>Thank you,<br>The Event Team</p>
 </body>
-</html> 
+</html>

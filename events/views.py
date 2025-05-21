@@ -13,6 +13,8 @@ from django.conf import settings
 from .models import Event, TicketTier, Ticket, Review, UserProfile
 from .forms import UserRegistrationForm, UserProfileForm, EventForm, TicketTierForm, ReviewForm
 import json
+
+from .utils.khalti import KhaltiPayment
 import requests
 from django.db.models import F, Count, Sum, Avg
 from django.db.models.functions import TruncDate, TruncMonth
@@ -153,6 +155,7 @@ def create_ticket_tier(request, event_id):
     
     return render(request, 'events/create_ticket_tier.html', {'form': form, 'event': event})
 
+
 @login_required
 def purchase_ticket(request, tier_id):
     ticket_tier = get_object_or_404(TicketTier, id=tier_id)
@@ -160,16 +163,13 @@ def purchase_ticket(request, tier_id):
     if request.method == 'POST':
         quantity = int(request.POST.get('quantity', 1))
         
+        # Validate quantity
         if quantity <= 0 or quantity > ticket_tier.available_tickets:
             messages.error(request, 'Invalid quantity selected.')
             return redirect('event_detail', event_id=ticket_tier.event.id)
         
-        if ticket_tier.available_tickets < quantity:
-            messages.error(request, 'Sorry, not enough tickets available!')
-            return redirect('event_detail', event_id=ticket_tier.event.id)
-        
         try:
-            # Create a single ticket with quantity
+            # Create ticket (initially with PENDING status)
             ticket = Ticket.objects.create(
                 tier=ticket_tier,
                 user=request.user,
@@ -177,78 +177,25 @@ def purchase_ticket(request, tier_id):
                 quantity=quantity
             )
             
-            # Calculate total amount
-            total_amount = ticket_tier.price * quantity
-            
-            # Convert price to paisa (Khalti uses paisa)
-            amount_in_paisa = int(total_amount * 100)
-            
-            # Prepare Khalti payment
-            payload = {
-                'return_url': request.build_absolute_uri(f'/payment/verify/{ticket.id}/'),
-                'website_url': request.build_absolute_uri('/'),
-                'amount': amount_in_paisa,
-                'purchase_order_id': str(ticket.id),
-                'purchase_order_name': f'{quantity} Ticket(s) for {ticket_tier.event.title}',
-                'customer_info': {
-                    'name': request.user.get_full_name() or request.user.username,
-                    'email': request.user.email,
-                    'phone': request.user.userprofile.phone if hasattr(request.user, 'userprofile') else ''
-                }
-            }
-            
-            # Use the correct API endpoint based on environment
-            api_url = 'https://dev.khalti.com/api/v2/epayment/initiate/'
-            
-            headers = {
-                'Authorization': 'Key {settings.KHALTI_SECRET_KEY}',
-                'Content-Type': 'application/json',
-            }
-            
-            # Make the API request to Khalti
-            response = requests.post(
-                api_url,
-                json=payload,
-                headers=headers,
-                verify=True,
-                timeout=30
+            # Initiate Khalti payment
+            payment_data = KhaltiPayment.initiate_payment(
+                request,
+                ticket,
+                'verify_payment'
             )
             
-            response_data = response.json()
+            # Update ticket with payment ID
+            ticket.payment_id = payment_data.get('pidx', '')
+            ticket.save()
             
-            # Log the response for debugging
-            print(f"Khalti Response Status: {response.status_code}")
-            print(f"Khalti Response: {response_data}")
+            # Redirect to Khalti payment page
+            return redirect(payment_data['payment_url'])
             
-            if response.status_code == 200:
-                if 'payment_url' in response_data:
-                    # Update ticket with Khalti reference
-                    ticket.payment_id = response_data.get('pidx', '')
-                    ticket.save()
-                    
-                    # Redirect to Khalti payment page
-                    return redirect(response_data['payment_url'])
-                else:
-                    raise ValueError("Payment URL not found in response")
-            else:
-                error_message = response_data.get('detail', 'Unknown error occurred')
-                raise ValueError(f"Khalti API error: {error_message}")
-                
-        except requests.exceptions.RequestException as e:
-            # Handle network/request errors
-            ticket.delete()
-            messages.error(request, f'Payment service connection error: {str(e)}')
-            return redirect('event_detail', event_id=ticket_tier.event.id)
-        except ValueError as e:
-            # Handle Khalti API errors
-            ticket.delete()
-            messages.error(request, f'Payment initialization error: {str(e)}')
-            return redirect('event_detail', event_id=ticket_tier.event.id)
         except Exception as e:
-            # Handle any other unexpected errors
+            # Clean up ticket if payment initiation fails
             if 'ticket' in locals():
                 ticket.delete()
-            messages.error(request, 'An unexpected error occurred. Please try again.')
+            messages.error(request, str(e))
             return redirect('event_detail', event_id=ticket_tier.event.id)
     
     return render(request, 'events/purchase_ticket.html', {
@@ -259,81 +206,84 @@ def purchase_ticket(request, tier_id):
 @login_required
 def verify_payment(request, ticket_id):
     ticket = get_object_or_404(Ticket, id=ticket_id, user=request.user)
-    pidx = request.GET.get('pidx')
+    pidx = request.GET.get('pidx') or ticket.payment_id
     
     if not pidx:
         messages.error(request, 'Invalid payment verification request.')
         return redirect('event_detail', event_id=ticket.tier.event.id)
     
     try:
-        headers = {
-            'Authorization': 'Key {settings.KHALTI_SECRET_KEY}',
-            'Content-Type': 'application/json'
-        }
+        # Verify payment with Khalti
+        verification = KhaltiPayment.verify_payment(pidx)
         
-        # Use the correct API endpoint based on environment
-        api_url = 'https://dev.khalti.com/api/v2/epayment/lookup/'
-        
-        response = requests.post(
-            api_url,
-            json={'pidx': pidx},
-            headers=headers,
-            verify=True
-        )
-        
-        response_data = response.json()
-        
-        if response.status_code == 200:
-            status = response_data.get('status')
-            if status == 'Completed':
-                # Check if enough tickets are still available
-                if not ticket.tier.decrease_available_tickets(ticket.quantity):
-                    messages.error(request, 'Sorry, not enough tickets available now.')
-                    ticket.status = 'CANCELLED'
-                    ticket.save()
-                    return redirect('event_detail', event_id=ticket.tier.event.id)
-                
-                # Update ticket status and details
-                ticket.status = 'SOLD'
-                ticket.payment_id = pidx
-                
-                # Save the ticket (this will trigger QR code generation)
-                ticket.save()
-                
-                # Send confirmation email
-                subject = f'Ticket Confirmation - {ticket.tier.event.title}'
-                html_message = render_to_string('emails/ticket_confirmation.html', {'ticket': ticket})
-                plain_message = strip_tags(html_message)
-                
-                try:
-                    send_mail(
-                        subject,
-                        plain_message,
-                        settings.DEFAULT_FROM_EMAIL,
-                        [request.user.email],
-                        html_message=html_message,
-                        fail_silently=False
-                    )
-                except Exception as e:
-                    # Log email sending error but don't fail the transaction
-                    print(f"Error sending confirmation email: {str(e)}")
-                
-                messages.success(request, 'Payment successful! Your ticket has been confirmed.')
-                return redirect('my_tickets')
-            else:
+        if verification.get('status') == 'Completed':
+            # Check ticket availability again (in case sold out during payment)
+            if not ticket.tier.decrease_available_tickets(ticket.quantity):
+                messages.error(request, 'Sorry, not enough tickets available now.')
                 ticket.status = 'CANCELLED'
                 ticket.save()
-                messages.error(request, f'Payment verification failed. Status: {status}')
+                return redirect('event_detail', event_id=ticket.tier.event.id)
+            
+            # Update ticket status to SOLD (this will generate QR code)
+            ticket.status = 'SOLD'
+            ticket.payment_id = pidx
+            ticket.save()
+            
+            # Send confirmation email
+            send_ticket_confirmation_email(request, ticket)
+            
+            messages.success(request, 'Payment successful! Your ticket has been confirmed.')
+            return redirect('my_tickets')
         else:
-            error_message = response_data.get('detail', 'Unknown error occurred')
-            messages.error(request, f'Payment verification failed: {error_message}')
+            ticket.status = 'CANCELLED'
+            ticket.save()
+            messages.error(request, f'Payment verification failed. Status: {verification.get("status")}')
     
-    except requests.exceptions.RequestException as e:
-        messages.error(request, f'Error connecting to payment service: {str(e)}')
     except Exception as e:
-        messages.error(request, f'An unexpected error occurred: {str(e)}')
+        messages.error(request, str(e))
     
     return redirect('event_detail', event_id=ticket.tier.event.id)
+
+# views.py
+from django.urls import reverse
+from django.utils.dateformat import format
+
+def send_ticket_confirmation_email(request, ticket):
+    """Send ticket confirmation email with all details"""
+    subject = f'Ticket Confirmation - {ticket.tier.event.title}'
+    
+    # Format dates and times properly
+    event_date = ticket.tier.event.date.strftime('%B %d, %Y')  # e.g. "January 01, 2023"
+    event_time = ticket.tier.event.time.strftime('%I:%M %p')   # e.g. "02:30 PM"
+    
+    context = {
+        'user': request.user,
+        'event': {
+            'title': ticket.tier.event.title,
+            'date': event_date,
+            'time': event_time,
+            'venue': ticket.tier.event.venue,
+        },
+        'tier_name': ticket.tier.name,
+        'quantity': ticket.quantity,
+        'total_price': ticket.get_total_price(),
+        'my_tickets_url': request.build_absolute_uri(reverse('my_tickets'))
+    }
+    
+    html_message = render_to_string('emails/ticket_confirmation.html', context)
+    plain_message = strip_tags(html_message)
+    
+    try:
+        send_mail(
+            subject,
+            plain_message,
+            settings.DEFAULT_FROM_EMAIL,
+            [request.user.email],
+            html_message=html_message
+        )
+    except Exception as e:
+        logger.error(f"Failed to send ticket confirmation email: {str(e)}")
+
 
 @login_required
 def my_tickets(request):

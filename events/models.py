@@ -142,6 +142,7 @@ class Ticket(models.Model):
         Ticket ID: {self.id}
         Holder: {self.user.get_full_name() or self.user.username}
         Status: {self.status}
+        Quantity: {self.quantity}
         """
         
         qr.add_data(qr_data)
@@ -174,6 +175,10 @@ class Ticket(models.Model):
             self.generate_qr_code()
         
         super().save(*args, **kwargs)
+
+    def get_total_price(self):
+        """Calculate total price for this ticket (price * quantity)"""
+        return self.tier.price * self.quantity
 
 class Review(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='reviews')
