@@ -1,80 +1,46 @@
+<!-- events/templates/events/purchase_ticket.html -->
 {% extends 'base.html' %}
 
-{% block title %}Purchase Ticket - {{ ticket_tier.event.title }}{% endblock %}
-
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0">Purchase Ticket</h4>
+<div class="container mt-4">
+    <h2>Purchase Ticket: {{ ticket_tier.name }}</h2>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">{{ ticket_tier.event.title }}</h5>
+            <p class="card-text">{{ ticket_tier.event.description }}</p>
+            <p><strong>Price:</strong> NPR {{ ticket_tier.price }}</p>
+            <p><strong>Available:</strong> {{ ticket_tier.available_tickets }} tickets</p>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="quantity">Quantity</label>
+                    <input type="number" class="form-control" id="quantity" name="quantity" 
+                           min="1" max="{{ ticket_tier.available_tickets }}" value="1">
                 </div>
-                <div class="card-body">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <h5>Event Details</h5>
-                            <p><strong>{{ ticket_tier.event.title }}</strong></p>
-                            <p>
-                                <i class="fas fa-calendar"></i> {{ ticket_tier.event.date|date:"F d, Y" }}<br>
-                                <i class="fas fa-clock"></i> {{ ticket_tier.event.time|time:"g:i A" }}<br>
-                                <i class="fas fa-map-marker-alt"></i> {{ ticket_tier.event.venue }}
-                            </p>
-                        </div>
-                        <div class="col-md-6">
-                            <h5>Ticket Details</h5>
-                            <p>
-                                <strong>Tier:</strong> {{ ticket_tier.name }}<br>
-                                <strong>Price:</strong> Rs. {{ ticket_tier.price }}<br>
-                                <strong>Available:</strong> {{ ticket_tier.available_tickets }} tickets
-                            </p>
-                        </div>
+                
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="payment_method" 
+                               id="khalti" value="KHALTI" checked>
+                        <label class="form-check-label" for="khalti">
+                            Khalti Payment
+                        </label>
                     </div>
-
-                    <div class="alert alert-info">
-                        <h5>Ticket Includes:</h5>
-                        <p>{{ ticket_tier.description }}</p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="payment_method" 
+                               id="cash" value="CASH">
+                        <label class="form-check-label" for="cash">
+                            Cash Payment (Pay at venue)
+                        </label>
                     </div>
-
-                    {% if ticket_tier.available_tickets > 0 %}
-                        <form method="post" class="mt-4">
-                            {% csrf_token %}
-                            <div class="mb-3">
-                                <label for="quantity" class="form-label">Quantity:</label>
-                                <input type="number" name="quantity" id="quantity" class="form-control" min="1" max="{{ ticket_tier.available_tickets }}" value="1" required onchange="updateTotal()">
-                            </div>
-                            <div class="mb-3">
-                                <label for="total" class="form-label">Total Amount:</label>
-                                <input type="text" id="total" class="form-control" readonly value="Rs. {{ ticket_tier.price }}">
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-shopping-cart me-2"></i>Proceed to Payment
-                                </button>
-                                <a href="{% url 'event_detail' ticket_tier.event.id %}" class="btn btn-outline-secondary">
-                                    <i class="fas fa-arrow-left me-2"></i>Back to Event
-                                </a>
-                            </div>
-                        </form>
-                    {% else %}
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle me-2"></i>Sorry, this ticket tier is sold out!
-                        </div>
-                    {% endif %}
                 </div>
-            </div>
+                
+                <button type="submit" class="btn btn-primary">Continue</button>
+                <a href="{% url 'event_detail' ticket_tier.event.id %}" class="btn btn-secondary">Cancel</a>
+            </form>
         </div>
     </div>
 </div>
 {% endblock %}
-
-{% block extra_js %}
-<script>
-function updateTotal() {
-    const quantity = document.getElementById('quantity').value;
-    const price = {{ ticket_tier.price }};
-    const total = quantity * price;
-    document.getElementById('total').value = `Rs. ${total}`;
-}
-</script>
-{% endblock %} 

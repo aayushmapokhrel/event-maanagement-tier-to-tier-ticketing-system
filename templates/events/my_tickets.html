@@ -1,64 +1,196 @@
 {% extends 'base.html' %}
+{% load ticket_filters %}
 {% load static %}
+
 
 {% block title %}My Tickets{% endblock %}
 
+{% block extra_css %}
+<style>
+    .ticket-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .ticket-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .badge-cash {
+        background-color: #fd7e14;
+    }
+    .badge-pending {
+        background-color: #6c757d;
+    }
+    .payment-status {
+        font-size: 0.9rem;
+        padding: 0.35em 0.65em;
+    }
+    .ticket-actions .btn {
+        border-radius: 20px;
+    }
+    .qr-code-placeholder {
+        width: 150px;
+        height: 150px;
+        background-color: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        border-radius: 8px;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
-    <h1 class="mb-4">My Tickets</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>My Tickets</h1>
+        <a href="{% url 'event_list' %}" class="btn btn-outline-primary">
+            <i class="fas fa-plus me-2"></i>Find More Events
+        </a>
+    </div>
 
     {% if tickets %}
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-            {% for ticket in tickets %}
-                <div class="col">
-                    <div class="card h-100">
-                        {% if ticket.tier.event.image %}
-                            <img src="{{ ticket.tier.event.image.url }}" class="card-img-top" alt="{{ ticket.tier.event.title }}" style="height: 200px; object-fit: cover;">
-                        {% endif %}
-                        <div class="card-body">
-                            <h5 class="card-title">{{ ticket.tier.event.title }}</h5>
-                            <h6 class="card-subtitle mb-2 text-muted">{{ ticket.tier.name }}</h6>
-                            
-                            <div class="mb-3">
-                                <small class="text-muted">
-                                    <i class="fas fa-calendar me-2"></i>{{ ticket.tier.event.date|date:"F j, Y" }}
-                                </small><br>
-                                <small class="text-muted">
-                                    <i class="fas fa-clock me-2"></i>{{ ticket.tier.event.time|time:"g:i A" }}
-                                </small><br>
-                                <small class="text-muted">
-                                    <i class="fas fa-map-marker-alt me-2"></i>{{ ticket.tier.event.venue }}
-                                </small>
-                            </div>
+        <!-- Tab Navigation -->
+        <ul class="nav nav-tabs mb-4" id="ticketsTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all-tickets" type="button">
+                    All Tickets
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="confirmed-tab" data-bs-toggle="tab" data-bs-target="#confirmed-tickets" type="button">
+                    Confirmed
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-tickets" type="button">
+                    Pending Payment
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="past-tab" data-bs-toggle="tab" data-bs-target="#past-tickets" type="button">
+                    Past Events
+                </button>
+            </li>
+        </ul>
 
-                            <div class="mb-3">
-                                <span class="badge {% if ticket.status == 'SOLD' %}bg-success{% else %}bg-warning{% endif %}">
-                                    {{ ticket.status }}
-                                </span>
-                                <small class="text-muted d-block mt-1">
-                                    Purchased: {{ ticket.purchase_date|date:"M j, Y" }}
-                                </small>
-                            </div>
-
-                            {% if ticket.qr_code %}
-                                <div class="text-center mb-3">
-                                    <img src="{{ ticket.qr_code.url }}" alt="Ticket QR Code" style="width: 150px; height: 150px;">
-                                </div>
-                            {% endif %}
-                        </div>
-                        <div class="card-footer">
-                            <div class="d-grid gap-2">
-                                <a href="{% url 'download_ticket' ticket.id %}" class="btn btn-primary">
-                                    <i class="fas fa-download me-2"></i>Download Ticket
-                                </a>
-                                <a href="{% url 'event_detail' ticket.tier.event.id %}" class="btn btn-outline-secondary">
-                                    <i class="fas fa-info-circle me-2"></i>Event Details
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+        <!-- Tab Content -->
+        <div class="tab-content" id="ticketsTabContent">
+            <!-- All Tickets Tab -->
+            <div class="tab-pane fade show active" id="all-tickets" role="tabpanel">
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    {% for ticket in tickets %}
+                        {% include 'events/partials/ticket_card.html' %}
+                    {% endfor %}
                 </div>
-            {% endfor %}
+            </div>
+
+            <!-- Confirmed Tickets Tab -->
+            <div class="tab-pane fade" id="confirmed-tickets" role="tabpanel">
+                {% with tickets|filter_tickets:"SOLD,USED" as confirmed_tickets %}
+                    {% if confirmed_tickets %}
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                            {% for ticket in confirmed_tickets %}
+                                {% include 'events/partials/ticket_card.html' %}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>You don't have any confirmed tickets yet.
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Pending Tickets Tab -->
+            <div class="tab-pane fade" id="pending-tickets" role="tabpanel">
+                {% with tickets|filter_tickets:"PENDING,RESERVED" as pending_tickets %}
+                    {% if pending_tickets %}
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                            {% for ticket in pending_tickets %}
+                                <div class="col">
+                                    <div class="card h-100 ticket-card">
+                                        {% if ticket.tier.event.image %}
+                                            <img src="{{ ticket.tier.event.image.url }}" class="card-img-top" alt="{{ ticket.tier.event.title }}" style="height: 200px; object-fit: cover;">
+                                        {% endif %}
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ ticket.tier.event.title }}</h5>
+                                            <h6 class="card-subtitle mb-2 text-muted">{{ ticket.tier.name }}</h6>
+                                            
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <span class="badge {% if ticket.payment_method == 'CASH' %}badge-cash{% else %}badge-pending{% endif %} payment-status">
+                                                    {{ ticket.get_status_display }}
+                                                    {% if ticket.payment_method == 'CASH' %} (Cash){% endif %}
+                                                </span>
+                                                <small class="text-muted">
+                                                    {{ ticket.purchase_date|date:"M j, Y" }}
+                                                </small>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <small class="text-muted d-block">
+                                                    <i class="fas fa-calendar me-2"></i>{{ ticket.tier.event.date|date:"F j, Y" }}
+                                                </small>
+                                                <small class="text-muted d-block">
+                                                    <i class="fas fa-clock me-2"></i>{{ ticket.tier.event.time|time:"g:i A" }}
+                                                </small>
+                                                <small class="text-muted d-block">
+                                                    <i class="fas fa-map-marker-alt me-2"></i>{{ ticket.tier.event.venue }}
+                                                </small>
+                                            </div>
+
+                                            {% if ticket.payment_method == 'CASH' %}
+                                                <div class="alert alert-warning p-2 mb-3">
+                                                    <small>
+                                                        <i class="fas fa-info-circle me-2"></i>
+                                                        Please pay cash to the organizer to complete your purchase.
+                                                    </small>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="card-footer ticket-actions">
+                                            <div class="d-grid gap-2">
+                                                <a href="{% url 'event_detail' ticket.tier.event.id %}" class="btn btn-outline-primary">
+                                                    <i class="fas fa-info-circle me-2"></i>Event Details
+                                                </a>
+                                                {% if ticket.payment_method == 'KHALTI' and ticket.status == 'PENDING' %}
+                                                    <a href="{% url 'purchase_ticket' ticket.tier.id %}" class="btn btn-warning">
+                                                        <i class="fas fa-credit-card me-2"></i>Complete Payment
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>You don't have any pending tickets.
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Past Events Tab -->
+            <div class="tab-pane fade" id="past-tickets" role="tabpanel">
+                {% with tickets|filter_past_events as past_tickets %}
+                    {% if past_tickets %}
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                            {% for ticket in past_tickets %}
+                                {% include 'events/partials/ticket_card.html' %}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>You don't have any past event tickets.
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            </div>
         </div>
     {% else %}
         <div class="alert alert-info" role="alert">
@@ -67,4 +199,27 @@
         </div>
     {% endif %}
 </div>
-{% endblock %} 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Activate tab from URL hash if present
+    const hash = window.location.hash;
+    if (hash) {
+        const tabTrigger = document.querySelector(`[data-bs-target="${hash}"]`);
+        if (tabTrigger) {
+            new bootstrap.Tab(tabTrigger).show();
+        }
+    }
+
+    // Update URL hash when tabs are shown
+    const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]');
+    tabEls.forEach(tabEl => {
+        tabEl.addEventListener('shown.bs.tab', function (event) {
+            window.location.hash = event.target.getAttribute('data-bs-target');
+        });
+    });
+});
+</script>
+{% endblock %}

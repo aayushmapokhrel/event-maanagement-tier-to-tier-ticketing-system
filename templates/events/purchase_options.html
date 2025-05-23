@@ -1,0 +1,41 @@
+<!-- templates/events/purchase_options.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Choose Payment Method</h2>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">{{ ticket_tier.event.title }}</h5>
+            <p class="card-text">{{ ticket_tier.name }} Ticket</p>
+            <p class="card-text">Price: Rs. {{ ticket_tier.price }}</p>
+            
+            <div class="row mt-4">
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Pay with Khalti</h5>
+                            <p class="card-text">Instant online payment</p>
+                            <a href="{% url 'purchase_ticket' tier_id=ticket_tier.id %}" 
+                               class="btn btn-primary">Pay Now</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Pay with Cash</h5>
+                            <p class="card-text">Pay at the event venue</p>
+                            <a href="{% url 'purchase_with_cash' tier_id=ticket_tier.id %}" 
+                               class="btn btn-outline-primary">Reserve Tickets</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <a href="{% url 'event_detail' event_id=ticket_tier.event.id %}" class="btn btn-secondary mt-3">Back to Event</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

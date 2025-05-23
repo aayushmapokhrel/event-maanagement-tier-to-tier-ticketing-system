@@ -36,6 +36,7 @@
                             <td>{{ ticket.purchase_date|date:"Y-m-d H:i" }}</td>
                             <td>Rs. {{ ticket.tier.price }}</td>
                             <td>{{ ticket.quantity }}</td>
+                            
                             <td>
                                 <span class="badge bg-{% if ticket.status == 'SOLD' %}success{% elif ticket.status == 'PENDING' %}warning{% elif ticket.status == 'USED' %}info{% else %}danger{% endif %}">
                                     {{ ticket.status }}

@@ -1,0 +1,69 @@
+<!-- events/templates/events/partials/ticket_card.html -->
+<div class="col">
+    <div class="card h-100 ticket-card">
+        {% if ticket.tier.event.image %}
+            <img src="{{ ticket.tier.event.image.url }}" class="card-img-top" alt="{{ ticket.tier.event.title }}" style="height: 200px; object-fit: cover;">
+        {% endif %}
+        <div class="card-body">
+            <h5 class="card-title">{{ ticket.tier.event.title }}</h5>
+            <h6 class="card-subtitle mb-2 text-muted">{{ ticket.tier.name }}</h6>
+            
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="badge 
+                    {% if ticket.status == 'USED' %}bg-success
+                    {% elif ticket.status == 'SOLD' %}bg-primary
+                    {% elif ticket.status == 'PENDING' and ticket.payment_method == 'CASH' %}badge-cash
+                    {% else %}bg-secondary{% endif %} payment-status">
+                    {{ ticket.get_status_display }}
+                    {% if ticket.payment_method == 'CASH' %} (Cash){% endif %}
+                </span>
+                <small class="text-muted">
+                    {{ ticket.purchase_date|date:"M j, Y" }}
+                </small>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted d-block">
+                    <i class="fas fa-calendar me-2"></i>{{ ticket.tier.event.date|date:"F j, Y" }}
+                </small>
+                <small class="text-muted d-block">
+                    <i class="fas fa-clock me-2"></i>{{ ticket.tier.event.time|time:"g:i A" }}
+                </small>
+                <small class="text-muted d-block">
+                    <i class="fas fa-map-marker-alt me-2"></i>{{ ticket.tier.event.venue }}
+                </small>
+            </div>
+
+            {% if ticket.qr_code %}
+                <div class="text-center mb-3">
+                    <img src="{{ ticket.qr_code.url }}" alt="Ticket QR Code" style="width: 150px; height: 150px;">
+                </div>
+            {% elif ticket.status == 'SOLD' %}
+                <div class="qr-code-placeholder mb-3">
+                    <small>QR Code Generating...</small>
+                </div>
+            {% endif %}
+
+            {% if ticket.payment_method == 'CASH' and ticket.status == 'PENDING' %}
+                <div class="alert alert-warning p-2 mb-3">
+                    <small>
+                        <i class="fas fa-info-circle me-2"></i>
+                        Please pay cash to the organizer to complete your purchase.
+                    </small>
+                </div>
+            {% endif %}
+        </div>
+        <div class="card-footer ticket-actions">
+            <div class="d-grid gap-2">
+                {% if ticket.status == 'SOLD' or ticket.status == 'USED' %}
+                    <a href="{% url 'download_ticket' ticket.id %}" class="btn btn-primary">
+                        <i class="fas fa-download me-2"></i>Download Ticket
+                    </a>
+                {% endif %}
+                <a href="{% url 'event_detail' ticket.tier.event.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-info-circle me-2"></i>Event Details
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

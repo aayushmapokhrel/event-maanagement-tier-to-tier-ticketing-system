@@ -16,13 +16,16 @@ class UserRegistrationForm(UserCreationForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.email = self.cleaned_data["email"]
-
+        
         if commit:
             user.save()
-            UserProfile.objects.create(
+            # Use get_or_create to prevent duplicate profiles
+            UserProfile.objects.get_or_create(
                 user=user,
-                phone_number=self.cleaned_data.get("phone_number", ""),
-                address=self.cleaned_data.get("address", ""),
+                defaults={
+                    'phone_number': self.cleaned_data.get("phone_number", ""),
+                    'address': self.cleaned_data.get("address", "")
+                }
             )
         return user
 

@@ -1,0 +1,46 @@
+<!-- templates/emails/new_event_notification.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Event: {{ event.title }}</title>
+    <style>
+        .event-info {
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            margin: 15px 0;
+            background-color: #f9f9f9;
+        }
+        .event-detail {
+            margin: 5px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h2>New Event Alert!</h2>
+    <p>Hello {{ user.username }},</p>
+    <p>A new event has been created that might interest you:</p>
+    
+    <div class="event-info">
+        <h3>{{ event.title }}</h3>
+        <div class="event-detail"><strong>Category:</strong> {{ event.category }}</div>
+        <div class="event-detail"><strong>Date:</strong> {{ event.date }} at {{ event.time }}</div>
+        <div class="event-detail"><strong>Venue:</strong> {{ event.venue }}</div>
+        <div class="event-detail"><strong>Description:</strong> {{ event.description }}</div>
+    </div>
+    
+    <a href="{{ event_url }}" class="cta-button">View Event Details</a>
+    
+    <p>Don't miss out on this exciting event! Click the button above to learn more and get your tickets.</p>
+    
+    <p>Thank you,<br>The Event Team</p>
+</body>
+</html> 

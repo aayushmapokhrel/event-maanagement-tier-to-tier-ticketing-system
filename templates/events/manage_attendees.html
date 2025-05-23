@@ -21,6 +21,10 @@
         background-color: #ffc107;
         color: #212529;
     }
+    .stats-card.cash-pending {
+        background-color: #fd7e14;
+        color: white;
+    }
     .table-responsive {
         border-radius: 10px;
         box-shadow: 0 0 15px rgba(0,0,0,0.1);
@@ -32,6 +36,9 @@
     }
     .export-btn {
         border-radius: 20px;
+    }
+    .badge-cash {
+        background-color: #fd7e14;
     }
 </style>
 {% endblock %}
@@ -60,22 +67,28 @@
     </div>
 
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="stats-card total">
                 <h4>Total Tickets</h4>
                 <h2 class="mb-0">{{ stats.total }}</h2>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="stats-card checked-in">
                 <h4>Checked In</h4>
                 <h2 class="mb-0">{{ stats.checked_in }}</h2>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="stats-card pending">
                 <h4>Pending Check-in</h4>
                 <h2 class="mb-0">{{ stats.pending }}</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card cash-pending">
+                <h4>Pending Cash</h4>
+                <h2 class="mb-0">{{ stats.cash_pending }}</h2>
             </div>
         </div>
     </div>
@@ -84,9 +97,14 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <input type="text" id="attendeeSearch" class="form-control search-box w-auto" placeholder="Search attendees...">
-                <a href="{% url 'checkin_dashboard' event.id %}" class="btn btn-outline-primary">
-                    <i class="fas fa-chart-line me-2"></i>Check-in Dashboard
-                </a>
+                <div>
+                    <a href="{% url 'checkin_dashboard' event.id %}" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-chart-line me-2"></i>Check-in Dashboard
+                    </a>
+                    <a href="#cashPayments" class="btn btn-outline-warning">
+                        <i class="fas fa-money-bill-wave me-2"></i>View Cash Payments
+                    </a>
+                </div>
             </div>
 
             <div class="table-responsive">
@@ -98,6 +116,7 @@
                             <th>Email</th>
                             <th>Ticket Type</th>
                             <th>Purchase Date</th>
+                            <th>Payment Method</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -111,14 +130,27 @@
                             <td>{{ ticket.tier.name }}</td>
                             <td>{{ ticket.purchase_date|date:"M d, Y H:i" }}</td>
                             <td>
-                                <span class="badge {% if ticket.status == 'USED' %}bg-success{% elif ticket.status == 'SOLD' %}bg-warning{% else %}bg-secondary{% endif %}">
-                                    {{ ticket.status }}
+                                <span class="badge {% if ticket.payment_method == 'CASH' %}badge-cash{% else %}bg-info{% endif %}">
+                                    {{ ticket.get_payment_method_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if ticket.status == 'USED' %}bg-success
+                                    {% elif ticket.status == 'SOLD' %}bg-warning
+                                    {% elif ticket.status == 'PENDING' and ticket.payment_method == 'CASH' %}badge-cash
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ ticket.get_status_display }}
                                 </span>
                             </td>
                             <td>
                                 {% if ticket.status == 'SOLD' %}
-                                <a href="{% url 'verify_ticket' ticket.id %}" class="btn btn-sm btn-success">
+                                <a href="{% url 'verify_ticket' ticket.id %}" class="btn btn-sm btn-success me-1">
                                     <i class="fas fa-check me-1"></i>Check In
+                                </a>
+                                {% elif ticket.status == 'PENDING' and ticket.payment_method == 'CASH' %}
+                                <a href="{% url 'verify_cash_payment' ticket.id %}" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-money-bill-wave me-1"></i>Verify
                                 </a>
                                 {% endif %}
                             </td>
@@ -127,6 +159,58 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- Cash Payments Section -->
+    <div class="card mt-4" id="cashPayments">
+        <div class="card-header bg-warning text-white">
+            <h4 class="mb-0"><i class="fas fa-money-bill-wave me-2"></i>Pending Cash Payments</h4>
+        </div>
+        <div class="card-body">
+            {% if cash_pending_tickets %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-warning">
+                        <tr>
+                            <th>Ticket ID</th>
+                            <th>Attendee Name</th>
+                            <th>Ticket Type</th>
+                            <th>Quantity</th>
+                            <th>Amount</th>
+                            <th>Request Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in cash_pending_tickets %}
+                        <tr>
+                            <td>{{ ticket.id }}</td>
+                            <td>{{ ticket.user.get_full_name|default:ticket.user.username }}</td>
+                            <td>{{ ticket.tier.name }}</td>
+                            <td>{{ ticket.quantity }}</td>
+                            <td>NPR {{ ticket.get_total_price }}</td>
+                            <td>{{ ticket.purchase_date|date:"M d, Y H:i" }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'verify_cash_payment' ticket.id %}" class="btn btn-sm btn-success me-1">
+                                        <i class="fas fa-check-circle me-1"></i>Verify
+                                    </a>
+                                    <a href="{% url 'cancel_ticket' ticket.id %}" class="btn btn-sm btn-danger">
+                                        <i class="fas fa-times-circle me-1"></i>Reject
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info mb-0">
+                <i class="fas fa-info-circle me-2"></i>No pending cash payments at this time.
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -148,6 +232,12 @@ document.addEventListener('DOMContentLoaded', function() {
             row.style.display = text.includes(term) ? '' : 'none';
         }
     });
+
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 });
 </script>
-{% endblock %} 
+{% endblock %}
