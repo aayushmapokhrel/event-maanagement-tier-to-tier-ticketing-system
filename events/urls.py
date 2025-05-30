@@ -60,53 +60,19 @@ urlpatterns = [
     ),
     path("organizer/dashboard/", views.organizer_dashboard, name="organizer_dashboard"),
     # Admin Dashboard URLs
-    path(
-        "custom-admin/dashboard/", admin_views.admin_dashboard, name="admin_dashboard"
-    ),
+    path("custom-admin/dashboard/", admin_views.admin_dashboard, name="admin_dashboard"),
     path("custom-admin/users/", admin_views.admin_users, name="admin_users"),
-    path(
-        "custom-admin/users/<int:user_id>/",
-        admin_views.get_user_details,
-        name="admin_get_user",
-    ),
+    path("custom-admin/users/<int:user_id>/", admin_views.get_user_details, name="admin_get_user"),
     path("custom-admin/users/add/", admin_views.add_user, name="admin_add_user"),
-    path(
-        "custom-admin/users/<int:user_id>/update/",
-        admin_views.update_user,
-        name="admin_update_user",
-    ),
-    path(
-        "custom-admin/users/<int:user_id>/toggle/",
-        admin_views.toggle_user_status,
-        name="admin_toggle_user",
-    ),
-    path(
-        "custom-admin/users/<int:user_id>/delete/",
-        admin_views.delete_user,
-        name="admin_delete_user",
-    ),
+    path("custom-admin/users/<int:user_id>/update/", admin_views.update_user, name="admin_update_user"),
+    path("custom-admin/users/<int:user_id>/toggle/", admin_views.toggle_user_status, name="admin_toggle_user"),
+    path("custom-admin/users/<int:user_id>/delete/", admin_views.delete_user, name="admin_delete_user"),
     path("custom-admin/events/", admin_views.admin_events, name="admin_events"),
-    path(
-        "custom-admin/events/<int:event_id>/",
-        admin_views.get_event_details,
-        name="admin_get_event",
-    ),
-    path("custom-admin/events/add/", admin_views.add_event, name="admin_add_event"),
-    path(
-        "custom-admin/events/<int:event_id>/update/",
-        admin_views.update_event,
-        name="admin_update_event",
-    ),
-    path(
-        "custom-admin/events/<int:event_id>/delete/",
-        admin_views.delete_event,
-        name="admin_delete_event",
-    ),
-    path(
-        "custom-admin/events/<int:event_id>/tickets/",
-        admin_views.event_tickets,
-        name="admin_event_tickets",
-    ),
+    path("custom-admin/events/<int:event_id>/", admin_views.get_event_details, name="admin_get_event"),
+  
+    path("custom-admin/events/<int:event_id>/delete/", admin_views.delete_event, name="admin_delete_event"),
+    path("custom-admin/events/<int:event_id>/tickets/", admin_views.event_tickets, name="admin_event_tickets"),
+    path("custom-admin/events/<int:event_id>/update-status/", admin_views.update_event_status, name="admin_update_event_status"),
     path("custom-admin/tickets/", admin_views.admin_tickets, name="admin_tickets"),
     path(
         "custom-admin/tickets/<int:ticket_id>/",
@@ -177,4 +143,27 @@ urlpatterns = [
         auth_views.LogoutView.as_view(next_page="admin_dashboard"),
         name="admin_logout",
     ),
+    path('custom-admin/events/<int:event_id>/update-status/', views.update_event_status, name='update_event_status'),
+    path('verify-email/<str:token>/', views.verify_email, name='verify_email'),
+    path('venues/available/', views.get_available_venues, name='get_available_venues'),
+    path('venues/check-availability/', views.check_venue_availability, name='check_venue_availability'),
+
+    # Admin Venue URLs
+    path("custom-admin/venues/", admin_views.admin_venues_list, name="admin_venues_list"),
+    path("custom-admin/venues/add/", admin_views.admin_add_venue, name="admin_add_venue"),
+    path("custom-admin/venues/<int:venue_id>/update/", admin_views.admin_edit_venue, name="admin_edit_venue"),
+    path("custom-admin/venues/<int:venue_id>/delete/", admin_views.admin_delete_venue, name="admin_delete_venue"),
+
+    # Admin Ticket Tier URLs
+    path("custom-admin/ticket-tiers/", admin_views.admin_ticket_tiers_list, name="admin_ticket_tiers_list"),
+    path("custom-admin/ticket-tiers/add/", admin_views.admin_add_ticket_tier, name="admin_add_ticket_tier"),
+    path("custom-admin/ticket-tiers/<int:tier_id>/update/", admin_views.admin_edit_ticket_tier, name="admin_edit_ticket_tier"),
+    path("custom-admin/ticket-tiers/<int:tier_id>/delete/", admin_views.admin_delete_ticket_tier, name="admin_delete_ticket_tier"),
+
+    # API endpoint for fetching events
+    path("custom-admin/api/events/", admin_views.admin_get_events_json, name="admin_get_events_json"),
+
+    # Admin URLs
+    path('custom-admin/events/add/', admin_views.admin_add_event, name='admin_add_event'),
+    path('custom-admin/events/<int:event_id>/edit/', admin_views.admin_edit_event, name='admin_edit_event'),
 ]

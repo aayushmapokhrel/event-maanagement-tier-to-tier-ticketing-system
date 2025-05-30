@@ -1,0 +1,320 @@
+{% extends 'admin_dashboard/base.html' %}
+{% load static %}
+
+{% block title %}Admin Dashboard - Ticket Tiers{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">Ticket Tier Management</h1>
+    <p class="mb-4">Manage ticket tiers on the platform.</p>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Ticket Tiers</h6>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTicketTierModal">
+                <i class="fas fa-plus"></i> Add Ticket Tier
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="ticketTiersTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Total Quantity</th>
+                            <th>Available Tickets</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tier in ticket_tiers %}
+                        <tr data-tier-id="{{ tier.id }}">
+                            <td>{{ tier.event.title }}</td>
+                            <td>{{ tier.name }}</td>
+                            <td>{{ tier.price }}</td>
+                            <td>{{ tier.quantity }}</td>
+                            <td>{{ tier.available_tickets }}</td>
+                            <td>
+                                <button class="btn btn-info btn-sm edit-ticket-tier-btn" data-tier-id="{{ tier.id }}">Edit</button>
+                                <button class="btn btn-danger btn-sm delete-ticket-tier-btn" data-tier-id="{{ tier.id }}">Delete</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Ticket Tier Modal -->
+<div class="modal fade" id="addTicketTierModal" tabindex="-1" aria-labelledby="addTicketTierModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addTicketTierModalLabel">Add New Ticket Tier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTicketTierForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="addTierEvent" class="form-label">Event</label>
+                        <select class="form-select" id="addTierEvent" name="event" required>
+                            <option value="">Select Event</option>
+                            {# Options will be populated by JavaScript #}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tierName" class="form-label">Tier Name</label>
+                        <select class="form-select" id="tierName" name="name" required>
+                            <option value="">Select Tier Name</option>
+                            <option value="VIP">VIP</option>
+                            <option value="GENERAL">General</option>
+                            <option value="EARLY_BIRD">Early Bird</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addTierPrice" class="form-label">Price</label>
+                        <input type="number" class="form-control" id="addTierPrice" name="price" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addTierquantity" class="form-label">quantity</label>
+                        <input type="number" class="form-control" id="addTierquantity" name="quantity" step="0.01" required>
+                    </div>
+                    <!-- <div class="mb-3">
+                        <label for="addTierQuantity" class="form-label">Sold Quantity</label>
+                        <input type="number" class="form-control" id="addTierQuantity" name="sold_quantity" required>
+                    </div> -->
+                    
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="submitAddTicketTier">Add Ticket Tier</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Ticket Tier Modal -->
+<div class="modal fade" id="editTicketTierModal" tabindex="-1" aria-labelledby="editTicketTierModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editTicketTierModalLabel">Edit Ticket Tier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTicketTierForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="editTierId" name="tier_id">
+                    <div class="mb-3">
+                        <label for="editTierEvent" class="form-label">Event</label>
+                        {# Event will be displayed as text, not editable via this form #}
+                        <p id="editTierEventText"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editTierName" class="form-label">Tier Name</label>
+                        <input type="text" class="form-control" id="editTierName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editTierPrice" class="form-label">Price</label>
+                        <input type="number" class="form-control" id="editTierPrice" name="price" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editTierquantity" class="form-label">quantity</label>
+                        <input type="number" class="form-control" id="editTierquantity" name="quantity" step="0.01" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editTierAvailableTickets" class="form-label">Available Tickets</label>
+                        {# Available tickets will be displayed, not directly editable #}
+                        <p id="editTierAvailableTicketsText"></p>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="submitEditTicketTier">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    $(document).ready(function() {
+        var ticketTiersTable = $('#ticketTiersTable').DataTable();
+
+        // CSRF token function
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Delete Ticket Tier
+        $('#ticketTiersTable').on('click', '.delete-ticket-tier-btn', function() {
+            var tierId = $(this).data('tier-id');
+            var row = $(this).closest('tr');
+
+            if (confirm('Are you sure you want to delete this ticket tier? This action cannot be undone.')) {
+                $.ajax({
+                    url: `/custom-admin/ticket-tiers/${tierId}/delete/`,
+                    type: 'POST',
+                    headers: {'X-CSRFToken': getCookie('csrftoken')},
+                    success: function(response) {
+                        alert(response.message);
+                        ticketTiersTable.row(row).remove().draw();
+                    },
+                    error: function(xhr) {
+                        // Parse JSON error response if available, otherwise show status text
+                        var errorMsg = 'Error deleting ticket tier: ' + xhr.status + ' ' + xhr.statusText;
+                        try {
+                            var errorJson = JSON.parse(xhr.responseText);
+                            if (errorJson.error) errorMsg = 'Error deleting ticket tier: ' + errorJson.error;
+                        } catch (e) {
+                            // ignore
+                        }
+                        alert(errorMsg);
+                    }
+                });
+            }
+        });
+        
+        // Add Ticket Tier (Modal setup - fetch events)
+        $('#addTicketTierModal').on('show.bs.modal', function () {
+            // Fetch list of events for the dropdown
+            $.ajax({
+                url: '{% url "admin_get_events_json" %}', // Use the new JSON endpoint
+                type: 'GET',
+                success: function(response) {
+                    var eventSelect = $('#addTierEvent');
+                    eventSelect.empty();
+                    eventSelect.append('<option value="">Select Event</option>');
+                    if (response.events && response.events.length > 0) {
+                         response.events.forEach(function(event) {
+                            eventSelect.append('<option value="' + event.id + '">' + event.title + '</option>');
+                        });
+                    } else {
+                         eventSelect.append('<option value="">No events available</option>');
+                         // Optionally disable the submit button if no events
+                         $('#submitAddTicketTier').prop('disabled', true);
+                    }
+                },
+                error: function(xhr) {
+                    alert('Error fetching events: ' + xhr.responseText);
+                     $('#submitAddTicketTier').prop('disabled', true);
+                }
+            });
+        });
+        
+        // Add Ticket Tier (Submitting data)
+        $('#submitAddTicketTier').on('click', function() {
+            var form = $('#addTicketTierForm');
+            var formData = form.serialize();
+
+            $.ajax({
+                url: '{% url "admin_add_ticket_tier" %}',
+                type: 'POST',
+                data: formData,
+                headers: {'X-CSRFToken': getCookie('csrftoken')},
+                success: function(response) {
+                    alert(response.message);
+                    $('#addTicketTierModal').modal('hide');
+                    // Simple refresh for now
+                    window.location.reload();
+                },
+                error: function(xhr) {
+                    var errorMsg = 'Error adding ticket tier: ' + xhr.status + ' ' + xhr.statusText;
+                    try {
+                        var errorJson = JSON.parse(xhr.responseText);
+                        if (errorJson.error) errorMsg = 'Error adding ticket tier: ' + errorJson.error;
+                    } catch (e) {
+                        // ignore
+                    }
+                    alert(errorMsg);
+                }
+            });
+        });
+
+        // Edit Ticket Tier (Fetching data for modal)
+        $('#ticketTiersTable').on('click', '.edit-ticket-tier-btn', function() {
+            var tierId = $(this).data('tier-id');
+
+            // Fetch ticket tier data via AJAX
+            $.ajax({
+                url: `/custom-admin/ticket-tiers/${tierId}/update/`, // Use GET for fetching data
+                type: 'GET',
+                success: function(tierData) {
+                    // Populate the edit modal form
+                    $('#editTierId').val(tierData.id);
+                    $('#editTierEventText').text(tierData.event_title); // Display event title
+                    $('#editTierName').val(tierData.name);
+                    $('#editTierPrice').val(tierData.price);
+                    $('#editTierTotalQuantity').val(tierData.total_quantity);
+                    $('#editTierAvailableTicketsText').text(tierData.available_tickets); // Display available tickets
+
+                    // Show the edit modal
+                    $('#editTicketTierModal').modal('show');
+                },
+                error: function(xhr) {
+                    var errorMsg = 'Error fetching ticket tier data: ' + xhr.status + ' ' + xhr.statusText;
+                    try {
+                        var errorJson = JSON.parse(xhr.responseText);
+                        if (errorJson.error) errorMsg = 'Error fetching ticket tier data: ' + errorJson.error;
+                    } catch (e) {
+                        // ignore
+                    }
+                    alert(errorMsg);
+                }
+            });
+        });
+        
+        // Edit Ticket Tier (Submitting updated data)
+        $('#submitEditTicketTier').on('click', function() {
+            var tierId = $('#editTierId').val();
+            var form = $('#editTicketTierForm');
+            var formData = form.serialize();
+
+            $.ajax({
+                url: `/custom-admin/ticket-tiers/${tierId}/update/`,
+                type: 'POST',
+                data: formData,
+                headers: {'X-CSRFToken': getCookie('csrftoken')},
+                success: function(response) {
+                    alert(response.message);
+                    $('#editTicketTierModal').modal('hide');
+                    // Simple refresh for now
+                    window.location.reload();
+                },
+                error: function(xhr) {
+                    var errorMsg = 'Error updating ticket tier: ' + xhr.status + ' ' + xhr.statusText;
+                    try {
+                        var errorJson = JSON.parse(xhr.responseText);
+                        if (errorJson.error) errorMsg = 'Error updating ticket tier: ' + errorJson.error;
+                    } catch (e) {
+                        // ignore
+                    }
+                    alert(errorMsg);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %} 

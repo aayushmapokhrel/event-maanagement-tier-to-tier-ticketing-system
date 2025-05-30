@@ -1,9 +1,9 @@
 from django.contrib.admin.views.decorators import staff_member_required
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Count, Sum, F
 from django.utils import timezone
 from datetime import timedelta
-from .models import Event, Ticket, Review
+from .models import Event, Ticket, Review, User, Venue, TicketTier
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
@@ -12,7 +12,17 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
+from django.contrib import messages
 import os
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Q
+from django.urls import reverse
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import redirect
+from events.forms import EventAdminForm
 
 
 @staff_member_required
@@ -118,18 +128,20 @@ def admin_users(request):
     return render(request, "admin_dashboard/users.html", {"users": users})
 
 
-@staff_member_required
-def admin_events(request):
-    # Get all events with optimized query
-    events = (
-        Event.objects.select_related("organizer")
-        .prefetch_related("ticket_tiers__tickets")
-        .all()
-    )
+def is_admin(user):
+    return user.is_staff
 
-    # Add today's date to context for status comparison
-    context = {"events": events, "today": timezone.now().date()}
-    return render(request, "admin_dashboard/events.html", context)
+
+@login_required
+@user_passes_test(is_admin)
+def admin_events(request):
+    events = Event.objects.all().order_by('-created_at')
+    # Get only available venues
+    venues = Venue.objects.filter(is_available=True)
+    return render(request, 'admin_dashboard/events.html', {
+        'events': events,
+        'venues': venues
+    })
 
 
 @staff_member_required
@@ -335,93 +347,20 @@ def delete_user(request, user_id):
         return JsonResponse({"error": str(e)}, status=400)
 
 
-@staff_member_required
-@require_POST
-def add_event(request):
-    try:
-        # Get form data
-        title = request.POST.get("name")
-        category = request.POST.get("category")
-        venue = request.POST.get("venue")
-        capacity = request.POST.get("capacity")
-        description = request.POST.get("description")
-        image = request.FILES.get("image")
 
-        # Handle date and time separately
-        date_str = request.POST.get("date")
-        time_str = request.POST.get("time")
-        if not date_str or not time_str:
-            return JsonResponse({"error": "Date and time are required"}, status=400)
-
-        from datetime import datetime
-
-        event_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        event_time = datetime.strptime(time_str, "%H:%M").time()
-
-        # Create event
-        event = Event.objects.create(
-            title=title,
-            category=category,
-            date=event_date,
-            time=event_time,
-            venue=venue,
-            capacity=capacity,
-            description=description,
-            organizer=request.user,
-        )
-
-        if image:
-            event.image = image
-            event.save()
-
-        return JsonResponse(
-            {"message": "Event created successfully", "event_id": event.id}
-        )
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
-
-
-@staff_member_required
-@require_POST
-def update_event(request, event_id):
-    try:
-        event = get_object_or_404(Event, id=event_id)
-
-        # Get form data
-        event.title = request.POST.get("name", event.title)
-        event.category = request.POST.get("category", event.category)
-        event.venue = request.POST.get("venue", event.venue)
-        event.capacity = request.POST.get("capacity", event.capacity)
-        event.description = request.POST.get("description", event.description)
-
-        # Handle date and time separately
-        date_str = request.POST.get("date")
-        time_str = request.POST.get("time")
-        if date_str and time_str:
-            from datetime import datetime
-
-            event.date = datetime.strptime(date_str, "%Y-%m-%d").date()
-            event.time = datetime.strptime(time_str, "%H:%M").time()
-
-        # Handle image upload
-        if "image" in request.FILES:
-            event.image = request.FILES["image"]
-
-        event.save()
-        return JsonResponse({"message": "Event updated successfully"})
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
-
-
-@staff_member_required
-@require_POST
+@login_required
+@user_passes_test(is_admin)
 def delete_event(request, event_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+    event = get_object_or_404(Event, id=event_id)
+    
     try:
-        event = get_object_or_404(Event, id=event_id)
         event.delete()
-        return JsonResponse({"message": "Event deleted successfully"})
+        return JsonResponse({'message': 'Event deleted successfully'})
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @staff_member_required
@@ -637,24 +576,26 @@ def get_user_details(request, user_id):
         return JsonResponse({"error": str(e)}, status=400)
 
 
-@staff_member_required
-@require_GET
+@login_required
+@user_passes_test(is_admin)
 def get_event_details(request, event_id):
     try:
         event = get_object_or_404(Event, id=event_id)
-        event_data = {
-            "id": event.id,
-            "title": event.title,
-            "date": event.date.strftime("%Y-%m-%d"),
-            "venue": event.venue,
-            "description": event.description,
-            "category": event.category,
-            "capacity": event.capacity,
-            "image_url": event.image.url if event.image else None,
+        data = {
+            'id': event.id,
+            'title': event.title,
+            'description': event.description,
+            'category': event.category,
+            'date': event.date.isoformat(),
+            'time': event.time.strftime('%H:%M'),
+            'venue': event.venue.name if event.venue else event.custom_venue,
+            'capacity': event.capacity,
+            'status': event.status,
+            'organizer': event.organizer.username,
         }
-        return JsonResponse(event_data)
+        return JsonResponse(data)
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @staff_member_required
@@ -678,3 +619,436 @@ def get_payment_details(request, payment_id):
         return JsonResponse(payment_data)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def update_event_status(request, event_id):
+    if request.method == "POST":
+        try:
+            event = get_object_or_404(Event, id=event_id)
+            data = json.loads(request.body)
+            action = data.get("action")
+            admin_notes = data.get("admin_notes", "")
+            suggested_venue_ids = data.get("suggested_venues", [])
+
+            if action not in ["APPROVED", "REJECTED"]:
+                return JsonResponse({'error': 'Invalid action'}, status=400)
+
+            if action == "APPROVED":
+                event.status = "APPROVED"
+                event.is_active = True
+                event.admin_notes = admin_notes
+                event.save()
+
+                # Send approval email
+                subject = f"Your Event '{event.title}' Has Been Approved"
+                event_url = request.build_absolute_uri(
+                    reverse('event_detail', args=[event.id])
+                )
+                
+                context = {
+                    'event': event,
+                    'admin_notes': admin_notes,
+                    'event_url': event_url,
+                    'organizer': event.organizer,
+                }
+                
+                html_message = render_to_string('emails/event_approved.html', context)
+                plain_message = strip_tags(html_message)
+                
+                send_mail(
+                    subject=subject,
+                    message=plain_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[event.organizer.email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+
+                return JsonResponse({
+                    'message': 'Event approved successfully',
+                    'status': 'success'
+                })
+            else:  # REJECTED
+                # Get suggested venues if any
+                suggested_venues = []
+                if suggested_venue_ids:
+                    suggested_venues = Venue.objects.filter(
+                        id__in=suggested_venue_ids,
+                        is_available=True
+                    ).values('id', 'name', 'capacity', 'address', 'description')
+
+                # Send rejection email with venue suggestions
+                subject = f"Your Event '{event.title}' Has Been Rejected"
+                dashboard_url = request.build_absolute_uri(reverse('organizer_dashboard'))
+                
+                context = {
+                    'event': event,
+                    'admin_notes': admin_notes,
+                    'suggested_venues': suggested_venues,
+                    'organizer': event.organizer,
+                    'dashboard_url': dashboard_url
+                }
+                
+                html_message = render_to_string('emails/event_rejected.html', context)
+                plain_message = strip_tags(html_message)
+                
+                send_mail(
+                    subject=subject,
+                    message=plain_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[event.organizer.email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+
+                # Delete the event after sending email
+                event.delete()
+                
+                return JsonResponse({
+                    'message': 'Event rejected successfully',
+                    'status': 'success'
+                })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@login_required
+@user_passes_test(is_admin)
+def get_available_venues(request):
+    """Get available venues for a specific date"""
+    try:
+        date = request.GET.get('date')
+        if not date:
+            return JsonResponse({'error': 'Date is required'}, status=400)
+            
+        # Get all venues
+        all_venues = Venue.objects.filter(is_available=True)
+        
+        # Get venues that are already booked for this date
+        booked_venues = Event.objects.filter(
+            date=date,
+            status='APPROVED'
+        ).values_list('venue_id', flat=True)
+        
+        # Filter out booked venues
+        available_venues = all_venues.exclude(id__in=booked_venues)
+        
+        # Format venue data
+        venues_data = [{
+            'id': venue.id,
+            'name': venue.name,
+            'capacity': venue.capacity,
+            'address': venue.address,
+            'description': venue.description
+        } for venue in available_venues]
+        
+        return JsonResponse({'venues': venues_data})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@user_passes_test(is_admin)
+def check_venue_availability(request):
+    """Check if a venue is available for a specific date"""
+    try:
+        venue_id = request.GET.get('venue_id')
+        date = request.GET.get('date')
+        
+        if not venue_id or not date:
+            return JsonResponse({'error': 'Venue ID and date are required'}, status=400)
+            
+        # Check if venue exists and is available
+        venue = Venue.objects.filter(id=venue_id, is_available=True).first()
+        if not venue:
+            return JsonResponse({'available': False, 'message': 'Venue not found or not available'})
+            
+        # Check if venue is booked for the date
+        is_booked = Event.objects.filter(
+            venue_id=venue_id,
+            date=date,
+            status='APPROVED'
+        ).exists()
+        
+        return JsonResponse({
+            'available': not is_booked,
+            'message': 'Venue is already booked for this date' if is_booked else 'Venue is available'
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Admin Venue Views
+@staff_member_required
+def admin_venues_list(request):
+    venues = Venue.objects.all()
+    return render(request, 'admin_dashboard/venues.html', {'venues': venues})
+
+@staff_member_required
+@require_POST
+def admin_add_venue(request):
+    try:
+        # Read data from request.POST instead of json.loads(request.body)
+        name = request.POST.get('name')
+        address = request.POST.get('address')
+        capacity_str = request.POST.get('capacity')
+        # Checkbox values are sent as 'on' if checked, and not sent if unchecked
+        is_available = request.POST.get('is_available') == 'on'
+
+        if not all([name, address, capacity_str]):
+             return JsonResponse({"error": "Name, address, and capacity are required"}, status=400)
+
+        try:
+            capacity = int(capacity_str)
+            if capacity < 0:
+                 return JsonResponse({"error": "Capacity cannot be negative"}, status=400)
+        except ValueError:
+             return JsonResponse({"error": "Capacity must be a number"}, status=400)
+
+        # Create the new venue
+        venue = Venue.objects.create(
+            name=name,
+            address=address,
+            capacity=capacity,
+            is_available=is_available
+        )
+
+        return JsonResponse({'message': 'Venue added successfully', 'venue_id': venue.id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@staff_member_required
+def admin_edit_venue(request, venue_id):
+    venue = get_object_or_404(Venue, id=venue_id)
+
+    if request.method == 'GET':
+        # Return venue data as JSON for the edit modal
+        venue_data = {
+            'id': venue.id,
+            'name': venue.name,
+            'address': venue.address,
+            'capacity': venue.capacity,
+            'is_available': venue.is_available,
+        }
+        return JsonResponse(venue_data)
+
+    elif request.method == 'POST':
+        # Handle POST request to update the venue
+        try:
+            # Read data from request.POST instead of json.loads(request.body)
+            venue.name = request.POST.get('name', venue.name)
+            venue.address = request.POST.get('address', venue.address)
+            capacity_str = request.POST.get('capacity', str(venue.capacity))
+            # Handle checkbox value correctly (sent as 'on' or not sent)
+            venue.is_available = request.POST.get('is_available') == 'on'
+
+            try:
+                venue.capacity = int(capacity_str)
+                if venue.capacity < 0:
+                    return JsonResponse({"error": "Capacity cannot be negative"}, status=400)
+            except ValueError:
+                return JsonResponse({"error": "Capacity must be a number"}, status=400)
+
+            venue.save()
+
+            return JsonResponse({'message': 'Venue updated successfully'})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@staff_member_required
+@require_POST
+def admin_delete_venue(request, venue_id):
+    try:
+        venue = get_object_or_404(Venue, id=venue_id)
+        venue.delete()
+        return JsonResponse({'message': 'Venue deleted successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Admin Ticket Tier Views
+@staff_member_required
+def admin_ticket_tiers_list(request):
+    ticket_tiers = TicketTier.objects.all().select_related('event') # Select related event for display
+    return render(request, 'admin_dashboard/ticket_tiers.html', {'ticket_tiers': ticket_tiers})
+
+@staff_member_required
+@require_POST
+def admin_add_ticket_tier(request):
+    try:
+        # Read data from request.POST
+        event_id = request.POST.get('event')
+        name = request.POST.get('name')
+        price_str = request.POST.get('price')
+        # Use 'quantity' as the field name for total quantity, matching the model likely
+        quantity_str = request.POST.get('quantity')
+
+        if not all([event_id, name, price_str, quantity_str]):
+             return JsonResponse({"error": "All fields are required"}, status=400)
+
+        # Get the event
+        event = get_object_or_404(Event, id=event_id)
+
+        # Validate and convert price and quantity
+        try:
+            price = float(price_str)
+            if price < 0:
+                return JsonResponse({"error": "Price cannot be negative"}, status=400)
+        except ValueError:
+            return JsonResponse({"error": "Price must be a number"}, status=400)
+
+        try:
+            total_quantity = int(quantity_str) # Use total_quantity variable for clarity in logic
+            if total_quantity < 0:
+                 return JsonResponse({"error": "Total quantity cannot be negative"}, status=400)
+        except ValueError:
+             return JsonResponse({"error": "Total quantity must be an integer"}, status=400)
+
+        # Create the new ticket tier
+        # Use 'quantity' as the field name for the model
+        tier = TicketTier.objects.create(
+            event=event,
+            name=name,
+            price=price,
+            quantity=total_quantity, # Assign to the 'quantity' field on the model
+            # sold_quantity will likely default to 0
+        )
+
+        return JsonResponse({'message': 'Ticket tier added successfully', 'tier_id': tier.id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@staff_member_required
+def admin_edit_ticket_tier(request, tier_id):
+    tier = get_object_or_404(TicketTier, id=tier_id)
+
+    if request.method == 'GET':
+        # Return ticket tier data as JSON for the edit modal
+        # Use 'total_quantity' key to match the frontend JavaScript expectation
+        tier_data = {
+            'id': tier.id,
+            'event_id': tier.event.id,
+            'event_title': tier.event.title, # Include event title for display
+            'name': tier.name,
+            'price': float(tier.price), # Convert Decimal to float for JSON serialization
+            'total_quantity': tier.quantity, # Get total quantity from tier.quantity
+            'available_tickets': tier.available_tickets,
+        }
+        return JsonResponse(tier_data)
+
+    elif request.method == 'POST':
+        # Handle POST request to update the ticket tier
+        try:
+            # Read data from request.POST
+            tier.name = request.POST.get('name', tier.name)
+            price_str = request.POST.get('price', str(tier.price))
+            # Read total quantity from 'quantity' field in the form
+            quantity_str = request.POST.get('quantity', str(tier.quantity))
+
+            # Validate and convert price
+            try:
+                tier.price = float(price_str)
+                if tier.price < 0:
+                    return JsonResponse({"error": "Price cannot be negative"}, status=400)
+            except ValueError:
+                return JsonResponse({"error": "Price must be a number"}, status=400)
+
+            # Validate and update total quantity
+            try:
+                new_total_quantity = int(quantity_str) # Use total_quantity variable for clarity in logic
+                if new_total_quantity < 0:
+                     return JsonResponse({"error": "Total quantity cannot be negative"}, status=400)
+
+                # Prevent setting total quantity below tickets already sold
+                # Calculate sold tickets based on the tier's sold_quantity field
+                sold_tickets = tier.sold_quantity
+
+                if new_total_quantity < sold_tickets:
+                     return JsonResponse({"error": f"Total quantity cannot be less than {sold_tickets} tickets already sold"}, status=400)
+
+                # Update the total quantity. The model should manage available_tickets.
+                tier.quantity = new_total_quantity # Assign to the 'quantity' field on the model
+                # tier.available_tickets is likely managed by the model, do not assign directly here
+
+            except ValueError:
+                 return JsonResponse({"error": "Total quantity must be an integer"}, status=400)
+
+            tier.save()
+
+            return JsonResponse({'message': 'Ticket tier updated successfully'})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@staff_member_required
+@require_POST
+def admin_delete_ticket_tier(request, tier_id):
+    try:
+        tier = get_object_or_404(TicketTier, id=tier_id)
+        # Before deleting the tier, consider if there are associated tickets.
+        # Depending on business logic, you might prevent deletion, mark tickets as invalid, etc.
+        # For now, we'll just delete the tier.
+        tier.delete()
+        return JsonResponse({'message': 'Ticket tier deleted successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@staff_member_required
+@require_GET
+def admin_get_events_json(request):
+    """Returns a list of events as JSON for use in dropdowns, etc."""
+    try:
+        events = Event.objects.all().values('id', 'title').order_by('title')
+        return JsonResponse({'events': list(events)})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@user_passes_test(is_admin)
+def admin_add_event(request):
+    if request.method == 'POST':
+        form = EventAdminForm(request.POST, request.FILES)
+        if form.is_valid():
+            event = form.save(commit=False)
+            event.organizer = request.user
+            event.status = 'APPROVED'
+            event.save()
+            messages.success(request, 'Event added successfully!')
+            return redirect('admin_events')  # Redirect to event list instead
+    else:
+        form = EventAdminForm()
+    
+    venues = Venue.objects.filter(is_available=True)
+    context = {
+        'form': form,
+        'venues': venues,
+        'title': 'Add New Event'
+    }
+    return render(request, 'admin_dashboard/event_form.html', context)
+
+@user_passes_test(is_admin)
+def admin_edit_event(request, event_id):
+    event = get_object_or_404(Event, id=event_id)
+    
+    if request.method == 'POST':
+        form = EventAdminForm(request.POST, request.FILES, instance=event)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Event updated successfully!')
+            return redirect('admin_events')  # Redirect to event list instead
+    else:
+        form = EventAdminForm(instance=event)
+    
+    venues = Venue.objects.filter(is_available=True)
+    context = {
+        'form': form,
+        'venues': venues,
+        'title': 'Edit Event',
+        'event': event
+    }
+    return render(request, 'admin_dashboard/event_form_edit.html', context)

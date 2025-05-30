@@ -93,9 +93,7 @@
                                 <button class="btn btn-sm btn-warning" onclick="resendTicket('{{ ticket.id }}')">
                                    Resend
                                 </button>
-                                <button class="btn btn-sm btn-danger" onclick="cancelTicket('{{ ticket.id }}')">
-                                    Cancel
-                                </button>
+                              
                             </td>
                         </tr>
                         {% endfor %}
@@ -130,20 +128,146 @@
 {% block extra_scripts %}
 <script>
     function viewTicketDetails(ticketId) {
-        // Implement view ticket details functionality
-        $('#ticketDetailsModal').modal('show');
+        fetch(`/custom-admin/tickets/${ticketId}/`)
+            .then(response => response.json())
+            .then(data => {
+                const detailsDiv = document.getElementById('ticketDetails');
+                if (data) {
+                    detailsDiv.innerHTML = `
+                        <div class="table-responsive">
+                            <table class="table">
+                                <tr>
+                                    <th>Ticket ID:</th>
+                                    <td>${data.id}</td>
+                                </tr>
+                                <tr>
+                                    <th>Attendee:</th>
+                                    <td>${data.user.username}</td>
+                                </tr>
+                                <tr>
+                                    <th>Event:</th>
+                                    <td>${data.tier.event.title}</td>
+                                </tr>
+                                <tr>
+                                    <th>Ticket Tier:</th>
+                                    <td>${data.tier.name}</td>
+                                </tr>
+                                <tr>
+                                    <th>Price:</th>
+                                    <td>Rs. ${data.tier.price}</td>
+                                </tr>
+                                <tr>
+                                    <th>Purchase Date:</th>
+                                    <td>${new Date(data.purchase_date).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td><span class="badge bg-${data.status === 'valid' ? 'success' : 'danger'}">${data.status === 'valid' ? 'Valid' : data.status.charAt(0).toUpperCase() + data.status.slice(1)}</span></td>
+                                </tr>
+                            </table>
+                        </div>
+                    `;
+                } else {
+                    detailsDiv.innerHTML = '<div class="alert alert-danger">Error loading ticket details.</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching ticket details:', error);
+                document.getElementById('ticketDetails').innerHTML = '<div class="alert alert-danger">Error loading ticket details.</div>';
+            });
+        
+        const modal = new bootstrap.Modal(document.getElementById('ticketDetailsModal'));
+        modal.show();
     }
 
     function resendTicket(ticketId) {
         if (confirm('Are you sure you want to resend the ticket email?')) {
             // Implement resend ticket functionality
+            fetch(`/custom-admin/tickets/${ticketId}/resend/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('success', 'Ticket email resent successfully.');
+                } else {
+                    showAlert('danger', data.error || 'An error occurred while resending the ticket.');
+                }
+            })
+            .catch(error => {
+                console.error('Error resending ticket:', error);
+                showAlert('danger', 'An error occurred while resending the ticket.');
+            });
         }
     }
 
     function cancelTicket(ticketId) {
         if (confirm('Are you sure you want to cancel this ticket?')) {
             // Implement cancel ticket functionality
+            fetch(`/custom-admin/tickets/${ticketId}/cancel/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('success', data.message || 'Ticket cancelled successfully.');
+                    // Optionally remove the row from the table
+                    // For now, let's just update the status badge if it exists
+                    const row = document.querySelector(`button[onclick="cancelTicket('${ticketId}')"]`).closest('tr');
+                    if (row) {
+                        const statusCell = row.querySelector('td:nth-child(6)'); // Assuming status is the 6th column
+                        if (statusCell) {
+                            statusCell.innerHTML = '<span class="badge bg-danger">Cancelled</span>';
+                            // Disable or remove action buttons
+                            row.querySelector('.btn-group').innerHTML = ''; // Remove all buttons
+                        }
+                    }
+                } else {
+                    showAlert('danger', data.error || 'An error occurred while cancelling the ticket.');
+                }
+            })
+            .catch(error => {
+                console.error('Error cancelling ticket:', error);
+                showAlert('danger', 'An error occurred while cancelling the ticket.');
+            });
         }
+    }
+
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Function to show alert
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            <strong>${message}</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.card'));
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 3000);
     }
 
     // Initialize DataTables

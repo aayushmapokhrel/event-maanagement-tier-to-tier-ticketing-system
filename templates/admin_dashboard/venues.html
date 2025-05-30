@@ -1,0 +1,258 @@
+{% extends 'admin_dashboard/base.html' %}
+{% load static %}
+
+{% block title %}Admin Dashboard - Venues{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">Venue Management</h1>
+    <p class="mb-4">Manage venues on the platform.</p>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Venues</h6>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVenueModal">
+                <i class="fas fa-plus"></i> Add Venue
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="venuesTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Address</th>
+                            <th>Capacity</th>
+                            <th>Is Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for venue in venues %}
+                        <tr data-venue-id="{{ venue.id }}">
+                            <td>{{ venue.name }}</td>
+                            <td>{{ venue.address }}</td>
+                            <td>{{ venue.capacity }}</td>
+                            <td>{% if venue.is_available %}Yes{% else %}No{% endif %}</td>
+                            <td>
+                                <button class="btn btn-info btn-sm edit-venue-btn" data-venue-id="{{ venue.id }}">Edit</button>
+                                <button class="btn btn-danger btn-sm delete-venue-btn" data-venue-id="{{ venue.id }}">Delete</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Venue Modal -->
+<div class="modal fade" id="addVenueModal" tabindex="-1" aria-labelledby="addVenueModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addVenueModalLabel">Add New Venue</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addVenueForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="venueName" class="form-label">Venue Name</label>
+                        <input type="text" class="form-control" id="venueName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="venueAddress" class="form-label">Address</label>
+                        <input type="text" class="form-control" id="venueAddress" name="address" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="venueCapacity" class="form-label">Capacity</label>
+                        <input type="number" class="form-control" id="venueCapacity" name="capacity" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="venueIsActive" name="is_available">
+                        <label class="form-check-label" for="venueIsActive">Is Active</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="submitAddVenue">Add Venue</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Venue Modal -->
+<div class="modal fade" id="editVenueModal" tabindex="-1" aria-labelledby="editVenueModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editVenueModalLabel">Edit Venue</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editVenueForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="editVenueId" name="venue_id">
+                    <div class="mb-3">
+                        <label for="editVenueName" class="form-label">Venue Name</label>
+                        <input type="text" class="form-control" id="editVenueName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editVenueAddress" class="form-label">Address</label>
+                        <input type="text" class="form-control" id="editVenueAddress" name="address" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editVenueCapacity" class="form-label">Capacity</label>
+                        <input type="number" class="form-control" id="editVenueCapacity" name="capacity" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="editVenueIsActive" name="is_available">
+                        <label class="form-check-label" for="editVenueIsActive">Is Active</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="submitEditVenue">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    $(document).ready(function() {
+        var venuesTable = $('#venuesTable').DataTable();
+
+        // CSRF token function
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Delete Venue
+        $('#venuesTable').on('click', '.delete-venue-btn', function() {
+            var venueId = $(this).data('venue-id');
+            var row = $(this).closest('tr');
+
+            if (confirm('Are you sure you want to delete this venue?')) {
+                $.ajax({
+                    url: `/custom-admin/venues/${venueId}/delete/`,
+                    type: 'POST',
+                    headers: {'X-CSRFToken': getCookie('csrftoken')},
+                    success: function(response) {
+                        alert(response.message);
+                        venuesTable.row(row).remove().draw();
+                    },
+                    error: function(xhr) {
+                        alert('Error deleting venue: ' + xhr.responseText);
+                    }
+                });
+            }
+        });
+
+        // Add Venue (Modal and AJAX)
+        $('#submitAddVenue').on('click', function() {
+            var form = $('#addVenueForm');
+            var formData = form.serialize();
+
+            $.ajax({
+                url: '{% url "admin_add_venue" %}',
+                type: 'POST',
+                data: formData,
+                headers: {'X-CSRFToken': getCookie('csrftoken')},
+                success: function(response) {
+                    alert(response.message);
+                    $('#addVenueModal').modal('hide');
+                    // Simple refresh for now, consider adding row dynamically later
+                    window.location.reload();
+                },
+                error: function(xhr) {
+                    // Parse JSON error response if available, otherwise show status text
+                    var errorMsg = 'Error adding venue:' + xhr.status + ' ' + xhr.statusText;
+                    try {
+                        var errorJson = JSON.parse(xhr.responseText);
+                        if (errorJson.error) errorMsg = 'Error adding venue: ' + errorJson.error;
+                    } catch (e) {
+                        // ignore
+                    }
+                    alert(errorMsg);
+                }
+            });
+        });
+
+        // Edit Venue (Fetching data for modal)
+        $('#venuesTable').on('click', '.edit-venue-btn', function() {
+            var venueId = $(this).data('venue-id');
+
+            // Fetch venue data via AJAX
+            $.ajax({
+                url: `/custom-admin/venues/${venueId}/update/`, // We will use this URL to fetch data
+                type: 'GET', // Use GET for fetching data
+                success: function(venueData) {
+                    // Populate the edit modal form
+                    $('#editVenueId').val(venueData.id);
+                    $('#editVenueName').val(venueData.name);
+                    $('#editVenueAddress').val(venueData.address);
+                    $('#editVenueCapacity').val(venueData.capacity);
+                    $('#editVenueIsActive').prop('checked', venueData.is_available);
+
+                    // Show the edit modal
+                    $('#editVenueModal').modal('show');
+                },
+                error: function(xhr) {
+                    alert('Error fetching venue data: ' + xhr.responseText);
+                }
+            });
+        });
+
+        // Edit Venue (Submitting updated data)
+        $('#submitEditVenue').on('click', function() {
+            var venueId = $('#editVenueId').val();
+            var form = $('#editVenueForm');
+            var formData = form.serialize();
+
+            $.ajax({
+                url: `/custom-admin/venues/${venueId}/update/`,
+                type: 'POST',
+                data: formData,
+                headers: {'X-CSRFToken': getCookie('csrftoken')},
+                success: function(response) {
+                    alert(response.message);
+                    $('#editVenueModal').modal('hide');
+                    // Simple refresh for now, consider updating row dynamically later
+                    window.location.reload();
+                },
+                error: function(xhr) {
+                    // Parse JSON error response if available, otherwise show status text
+                    var errorMsg = 'Error updating venue:' + xhr.status + ' ' + xhr.statusText;
+                    try {
+                        var errorJson = JSON.parse(xhr.responseText);
+                        if (errorJson.error) errorMsg = 'Error updating venue: ' + errorJson.error;
+                    } catch (e) {
+                        // ignore
+                    }
+                    alert(errorMsg);
+                }
+            });
+        });
+
+    });
+</script>
+{% endblock %} 

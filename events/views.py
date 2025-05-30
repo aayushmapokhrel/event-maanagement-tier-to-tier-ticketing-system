@@ -10,7 +10,7 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from events.models import Event, TicketTier, Ticket, UserProfile
+from events.models import Event, TicketTier, Ticket, UserProfile, Venue, EmailVerification
 from events.forms import (
     UserRegistrationForm,
     UserProfileForm,
@@ -28,31 +28,108 @@ from datetime import timedelta
 from django.utils.timesince import timesince
 from django.urls import reverse
 import logging
+from django.contrib.auth.models import User
 
 logger = logging.getLogger(__name__)
 
 
 def home(request):
-    featured_events = Event.objects.filter(is_active=True).order_by("-created_at")[:6]
+    featured_events = Event.objects.filter(is_active=True, status="APPROVED").order_by("-created_at")[:6]
     return render(request, "events/home.html", {"featured_events": featured_events})
 
 
 def register(request):
     if request.method == 'POST':
-        form = UserRegistrationForm(request.POST)
-        if form.is_valid():
-            try:
-                with transaction.atomic():
-                    user = form.save()
-                    login(request, user)
-                    messages.success(request, 'Registration successful!')
-                    return redirect('home')
-            except IntegrityError:
-                messages.error(request, 'An error occurred during registration. Please try again.')
-                return redirect('register')
-    else:
-        form = UserRegistrationForm()
-    return render(request, 'events/register.html', {'form': form})
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        confirm_password = request.POST.get('confirm_password')
+
+        if password != confirm_password:
+            messages.error(request, 'Passwords do not match!')
+            return redirect('register')
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already exists!')
+            return redirect('register')
+
+        if User.objects.filter(email=email).exists():
+            messages.error(request, 'Email already registered!')
+            return redirect('register')
+
+        # Create user but don't activate yet
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            is_active=False  # User will be activated after email verification
+        )
+
+        # Create email verification token
+        token = EmailVerification.generate_token()
+        verification = EmailVerification.objects.create(
+            user=user,
+            token=token
+        )
+
+        # Generate verification URL
+        verification_url = request.build_absolute_uri(
+            f'/verify-email/{token}/'
+        )
+
+        # Send verification email
+        context = {
+            'user': user,
+            'verification_url': verification_url
+        }
+        html_message = render_to_string('emails/verify_email.html', context)
+        plain_message = strip_tags(html_message)
+
+        try:
+            send_mail(
+                subject='Verify your email address',
+                message=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            messages.success(request, 'Registration successful! Please check your email to verify your account.')
+            return redirect('login')
+        except Exception as e:
+            # If email sending fails, delete the user and verification
+            user.delete()
+            messages.error(request, 'Failed to send verification email. Please try again.')
+            return redirect('register')
+
+    return render(request, 'registration/register.html')
+
+
+def verify_email(request, token):
+    try:
+        verification = EmailVerification.objects.get(token=token)
+        
+        # Check if token is expired (24 hours)
+        if timezone.now() - verification.created_at > timedelta(hours=24):
+            messages.error(request, 'Verification link has expired. Please register again.')
+            verification.user.delete()
+            return redirect('register')
+        
+        # Activate user
+        user = verification.user
+        user.is_active = True
+        user.save()
+        
+        # Mark verification as complete
+        verification.is_verified = True
+        verification.save()
+        
+        messages.success(request, 'Email verified successfully! You can now login.')
+        return redirect('login')
+    except EmailVerification.DoesNotExist:
+        messages.error(request, 'Invalid verification link.')
+        return redirect('register')
+
 
 @login_required
 def profile(request):
@@ -74,8 +151,8 @@ def profile(request):
 
 
 def event_list(request):
-    # Start with ordered queryset
-    events = Event.objects.filter(is_active=True).order_by("-date", "-time", "title")
+    # Start with ordered queryset, only showing approved events
+    events = Event.objects.filter(is_active=True, status="APPROVED").order_by("-date", "-time", "title")
 
     # Search functionality
     query = request.GET.get("q")
@@ -180,17 +257,24 @@ def create_event(request):
         if event_form.is_valid():
             event = event_form.save(commit=False)
             event.organizer = request.user
+            event.status = "PENDING"  # Set initial status as pending
             event.save()
 
-            # Send notification emails to all users
-            send_event_notification_email(request, event)
-
-            messages.success(request, "Event created successfully!")
-            return redirect("event_detail", event_id=event.id)
+            messages.success(
+                request, 
+                "Your event has been submitted for approval. You will be notified once it's approved."
+            )
+            return redirect("organizer_dashboard")
     else:
         event_form = EventForm()
 
-    return render(request, "events/create_event.html", {"form": event_form})
+    # Get available venues for the form
+    available_venues = Venue.objects.filter(is_available=True)
+    
+    return render(request, "events/create_event.html", {
+        "form": event_form,
+        "available_venues": available_venues
+    })
 
 
 @login_required
@@ -316,25 +400,31 @@ def verify_cash_payment(request, ticket_id):
 @login_required
 def my_tickets(request):
     tickets = Ticket.objects.filter(user=request.user).order_by("-purchase_date")
-    
+
     # Get filter parameters
-    status_filter = request.GET.get('status', '')
-    
+    status_filter = request.GET.get("status", "")
+
     # Apply filters if provided
     if status_filter:
-        tickets = tickets.filter(status__in=status_filter.split(','))
-    
+        tickets = tickets.filter(status__in=status_filter.split(","))
+
     # Separate tickets by status for better display
     pending_tickets = tickets.filter(status="PENDING", payment_method="CASH")
     confirmed_tickets = tickets.filter(status="SOLD")
-    other_tickets = tickets.exclude(status="PENDING", payment_method="CASH").exclude(status="SOLD")
-    
-    return render(request, 'events/my_tickets.html', {
-        'tickets': tickets,
-        'pending_tickets': pending_tickets,
-        'confirmed_tickets': confirmed_tickets,
-        'other_tickets': other_tickets,
-    })
+    other_tickets = tickets.exclude(status="PENDING", payment_method="CASH").exclude(
+        status="SOLD"
+    )
+
+    return render(
+        request,
+        "events/my_tickets.html",
+        {
+            "tickets": tickets,
+            "pending_tickets": pending_tickets,
+            "confirmed_tickets": confirmed_tickets,
+            "other_tickets": other_tickets,
+        },
+    )
 
 
 @login_required
@@ -765,3 +855,236 @@ def event_analytics(request, event_id):
     }
 
     return render(request, "events/event_analytics.html", context)
+
+
+@login_required
+def update_event_status(request, event_id):
+    """View to handle event status updates (approve/reject)"""
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    event = get_object_or_404(Event, id=event_id)
+    action = request.POST.get('action')
+    admin_notes = request.POST.get('admin_notes', '')
+    suggested_venues = request.POST.getlist('suggested_venues[]')  # Get list of suggested venue IDs
+
+    if action not in ['APPROVED', 'REJECTED']:
+        return JsonResponse({'error': 'Invalid action'}, status=400)
+
+    try:
+        if action == 'APPROVED':
+            # Update event status
+            event.status = 'APPROVED'
+            event.is_active = True
+            event.save()
+            
+            # Send approval email to event organizer
+            subject = f"Your Event '{event.title}' Has Been Approved!"
+            
+            # Format dates and times properly
+            event_date = event.date.strftime("%B %d, %Y")
+            event_time = event.time.strftime("%I:%M %p")
+            
+            context = {
+                'user': event.organizer,
+                'event': {
+                    'title': event.title,
+                    'date': event_date,
+                    'time': event_time,
+                    'venue': event.venue,
+                    'description': event.description,
+                },
+                'admin_notes': admin_notes,
+                'event_url': request.build_absolute_uri(
+                    reverse('event_detail', kwargs={'event_id': event.id})
+                ),
+                'dashboard_url': request.build_absolute_uri(
+                    reverse('organizer_dashboard')
+                )
+            }
+            
+            html_message = render_to_string('emails/event_approval.html', context)
+            plain_message = strip_tags(html_message)
+            
+            try:
+                send_mail(
+                    subject,
+                    plain_message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [event.organizer.email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+                logger.info(f"Approval email sent to {event.organizer.email} for event {event.title}")
+            except Exception as e:
+                logger.error(f"Failed to send event approval email to {event.organizer.email}: {str(e)}")
+                # Continue with the approval process even if email fails
+                
+        else:  # REJECTED
+            # Update event status
+            event.status = 'REJECTED'
+            event.is_active = False
+            event.save()
+            
+            # Get all active venues for suggestions
+            all_venues = Venue.objects.filter(is_active=True)
+            
+            # If specific venues were suggested, prioritize them
+            suggested_venues_data = []
+            if suggested_venues:
+                # Get the suggested venues first
+                suggested = all_venues.filter(id__in=suggested_venues)
+                suggested_venues_data.extend([{
+                    'name': venue.name,
+                    'capacity': venue.capacity,
+                    'address': venue.address,
+                    'description': venue.description,
+                    'is_suggested': True
+                } for venue in suggested])
+                
+                # Add other venues that weren't suggested
+                other_venues = all_venues.exclude(id__in=suggested_venues)
+                suggested_venues_data.extend([{
+                    'name': venue.name,
+                    'capacity': venue.capacity,
+                    'address': venue.address,
+                    'description': venue.description,
+                    'is_suggested': False
+                } for venue in other_venues])
+            else:
+                # If no specific venues were suggested, include all venues
+                suggested_venues_data = [{
+                    'name': venue.name,
+                    'capacity': venue.capacity,
+                    'address': venue.address,
+                    'description': venue.description,
+                    'is_suggested': False
+                } for venue in all_venues]
+            
+            # Send rejection email to event organizer
+            subject = f"Your Event '{event.title}' Has Been Rejected"
+            
+            context = {
+                'user': event.organizer,
+                'event': {
+                    'title': event.title,
+                    'date': event.date.strftime("%B %d, %Y"),
+                    'time': event.time.strftime("%I:%M %p"),
+                },
+                'admin_notes': admin_notes,
+                'suggested_venues': suggested_venues_data,
+                'dashboard_url': request.build_absolute_uri(
+                    reverse('organizer_dashboard')
+                )
+            }
+            
+            html_message = render_to_string('emails/event_rejection.html', context)
+            plain_message = strip_tags(html_message)
+            
+            try:
+                send_mail(
+                    subject,
+                    plain_message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [event.organizer.email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+                logger.info(f"Rejection email sent to {event.organizer.email} for event {event.title}")
+            except Exception as e:
+                logger.error(f"Failed to send event rejection email to {event.organizer.email}: {str(e)}")
+                # Continue with the rejection process even if email fails
+        
+        return JsonResponse({'message': f'Event {action.lower()} successfully'})
+    except Exception as e:
+        logger.error(f"Error updating event status: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def get_available_venues(request):
+    """Get a list of available venues based on date and capacity"""
+    date = request.GET.get('date')
+    capacity = request.GET.get('capacity')
+    
+    if not date:
+        return JsonResponse({'error': 'Date is required'}, status=400)
+    
+    try:
+        # Convert date string to datetime object
+        event_date = timezone.datetime.strptime(date, '%Y-%m-%d').date()
+        
+        # Get venues that are not booked for the given date
+        booked_venues = Event.objects.filter(
+            date=event_date,
+            is_active=True
+        ).values_list('venue', flat=True)
+        
+        # Query available venues
+        venues = Venue.objects.filter(is_active=True).exclude(id__in=booked_venues)
+        
+        # Filter by capacity if provided
+        if capacity:
+            venues = venues.filter(capacity__gte=int(capacity))
+        
+        # Prepare venue data
+        venue_data = [{
+            'id': venue.id,
+            'name': venue.name,
+            'address': venue.address,
+            'capacity': venue.capacity,
+            'description': venue.description
+        } for venue in venues]
+        
+        return JsonResponse({'venues': venue_data})
+        
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def check_venue_availability(request):
+    """Check if a specific venue is available on a given date"""
+    venue = request.GET.get('venue')
+    date = request.GET.get('date')
+    
+    if not venue or not date:
+        return JsonResponse({
+            'error': 'Both venue and date are required'
+        }, status=400)
+    
+    try:
+        # Convert date string to datetime object
+        event_date = timezone.datetime.strptime(date, '%Y-%m-%d').date()
+        
+        # Check if venue exists
+        venue = get_object_or_404(Venue, id=venue)
+        
+        # Check if venue is booked for the given date
+        is_booked = Event.objects.filter(
+            venue=venue,
+            date=event_date,
+            is_active=True
+        ).exists()
+        
+        return JsonResponse({
+            'venue': venue,
+            'date': date,
+            'is_available': not is_booked,
+            'venue_details': {
+                'name': venue.name,
+                'capacity': venue.capacity,
+                'address': venue.address
+            }
+        })
+        
+    except ValueError:
+        return JsonResponse({
+            'error': 'Invalid date format. Use YYYY-MM-DD'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)

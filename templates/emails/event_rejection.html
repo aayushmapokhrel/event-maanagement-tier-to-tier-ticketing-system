@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #f44336;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 0 0 5px 5px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #2196F3;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .venue-card {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .venue-card.suggested {
+            border-left: 4px solid #4CAF50;
+            background-color: #f8fff8;
+        }
+        .venue-card h4 {
+            color: #2196F3;
+            margin-top: 0;
+        }
+        .venue-details {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .venue-description {
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .suggested-badge {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .section-title {
+            color: #333;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Event Not Approved</h1>
+        </div>
+        <div class="content">
+            <p>Dear {{ user.get_full_name|default:user.username }},</p>
+            
+            <p>We regret to inform you that your event "{{ event.title }}" has not been approved at this time.</p>
+            
+            <h3 class="section-title">Event Details:</h3>
+            <ul>
+                <li><strong>Date:</strong> {{ event.date }}</li>
+                <li><strong>Time:</strong> {{ event.time }}</li>
+            </ul>
+            
+            {% if admin_notes %}
+            <h3 class="section-title">Admin Notes:</h3>
+            <p>{{ admin_notes }}</p>
+            {% endif %}
+            
+            {% if suggested_venues %}
+            <h3 class="section-title">Available Venues:</h3>
+            <p>Here are all available venues that you might consider for your event:</p>
+            
+            {% for venue in suggested_venues %}
+            <div class="venue-card {% if venue.is_suggested %}suggested{% endif %}">
+                <h4>
+                    {{ venue.name }}
+                    {% if venue.is_suggested %}
+                    <span class="suggested-badge">Recommended</span>
+                    {% endif %}
+                </h4>
+                <div class="venue-details">
+                    <p><strong>Capacity:</strong> {{ venue.capacity }} people</p>
+                    <p><strong>Address:</strong> {{ venue.address }}</p>
+                    {% if venue.description %}
+                    <div class="venue-description">
+                        <p>{{ venue.description }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+            
+            <p>You can review and update your event details in your organizer dashboard:</p>
+            <a href="{{ dashboard_url }}" class="button">Go to Dashboard</a>
+            
+            <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+            
+            <p>Thank you for your understanding.</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message, please do not reply directly to this email.</p>
+        </div>
+    </div>
+</body>
+</html> 

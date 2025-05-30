@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import UserProfile, Event, TicketTier, Review
+from .models import UserProfile, Event, TicketTier, Review, Venue
 
 
 class UserRegistrationForm(UserCreationForm):
@@ -34,9 +34,90 @@ class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
         fields = ("phone_number", "address", "profile_picture")
+class EventAdminForm(forms.ModelForm):
+    use_custom_venue = forms.BooleanField(
+        required=False,
+        label="Use a custom venue",
+        help_text="Check this if you want to specify a venue not in our system"
+    )
+    custom_venue = forms.CharField(
+        required=False,
+        max_length=200,
+        widget=forms.TextInput(attrs={"placeholder": "Enter custom venue details"})
+    )
 
+    class Meta:
+        model = Event
+        fields = (
+            "title",
+            "description",
+            "category",
+            "venue",
+            "date",
+            "time",
+            "capacity",
+            "image",
+            "is_active",
+            "status"
+        )
+        widgets = {
+            "title": forms.TextInput(attrs={"placeholder": "Enter event title"}),
+            "description": forms.Textarea(
+                attrs={"rows": 4, "placeholder": "Describe your event"}
+            ),
+            "venue": forms.Select(attrs={"class": "form-select"}),
+            "date": forms.DateInput(attrs={"type": "date"}),
+            "time": forms.TimeInput(attrs={"type": "time"}),
+            "capacity": forms.NumberInput(
+                attrs={"min": "1", "placeholder": "Enter maximum capacity"}
+            ),
+        }
+        help_texts = {
+            "title": "Choose a clear, descriptive title for your event.",
+            "description": "Provide detailed information about your event.",
+            "category": "Select the category that best fits your event.",
+            "venue": "Select a venue from our available venues or specify a custom venue.",
+            "date": "Select the event date.",
+            "time": "Select the start time of the event.",
+            "capacity": "Enter the maximum number of attendees.",
+            "image": "Upload an image for your event (recommended size: 800x600 pixels).",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only show available venues in the dropdown
+        self.fields['venue'].queryset = Venue.objects.filter(is_available=True)
+        self.fields['venue'].required = False  # Make venue not required initially
+
+    def clean(self):
+        cleaned_data = super().clean()
+        use_custom_venue = cleaned_data.get('use_custom_venue')
+        venue = cleaned_data.get('venue')
+        custom_venue = cleaned_data.get('custom_venue')
+
+        if use_custom_venue:
+            if not custom_venue:
+                raise forms.ValidationError("Please provide custom venue details.")
+            cleaned_data['venue'] = None
+        else:
+            if not venue:
+                raise forms.ValidationError("Please select a venue from the list.")
+            cleaned_data['custom_venue'] = ''
+
+        return cleaned_data
 
 class EventForm(forms.ModelForm):
+    use_custom_venue = forms.BooleanField(
+        required=False,
+        label="Use a custom venue",
+        help_text="Check this if you want to specify a venue not in our system"
+    )
+    custom_venue = forms.CharField(
+        required=False,
+        max_length=200,
+        widget=forms.TextInput(attrs={"placeholder": "Enter custom venue details"})
+    )
+
     class Meta:
         model = Event
         fields = (
@@ -54,7 +135,7 @@ class EventForm(forms.ModelForm):
             "description": forms.Textarea(
                 attrs={"rows": 4, "placeholder": "Describe your event"}
             ),
-            "venue": forms.TextInput(attrs={"placeholder": "Enter venue location"}),
+            "venue": forms.Select(attrs={"class": "form-select"}),
             "date": forms.DateInput(attrs={"type": "date"}),
             "time": forms.TimeInput(attrs={"type": "time"}),
             "capacity": forms.NumberInput(
@@ -65,12 +146,35 @@ class EventForm(forms.ModelForm):
             "title": "Choose a clear, descriptive title for your event.",
             "description": "Provide detailed information about your event.",
             "category": "Select the category that best fits your event.",
-            "venue": "Specify the location where the event will be held.",
+            "venue": "Select a venue from our available venues or specify a custom venue.",
             "date": "Select the event date.",
             "time": "Select the start time of the event.",
             "capacity": "Enter the maximum number of attendees.",
             "image": "Upload an image for your event (recommended size: 800x600 pixels).",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only show available venues in the dropdown
+        self.fields['venue'].queryset = Venue.objects.filter(is_available=True)
+        self.fields['venue'].required = False  # Make venue not required initially
+
+    def clean(self):
+        cleaned_data = super().clean()
+        use_custom_venue = cleaned_data.get('use_custom_venue')
+        venue = cleaned_data.get('venue')
+        custom_venue = cleaned_data.get('custom_venue')
+
+        if use_custom_venue:
+            if not custom_venue:
+                raise forms.ValidationError("Please provide custom venue details.")
+            cleaned_data['venue'] = None
+        else:
+            if not venue:
+                raise forms.ValidationError("Please select a venue from the list.")
+            cleaned_data['custom_venue'] = ''
+
+        return cleaned_data
 
 
 class TicketTierForm(forms.ModelForm):

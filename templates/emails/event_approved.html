@@ -1,0 +1,21 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<p>Dear {{ organizer.username }},</p>
+
+<p>We're pleased to inform you that your event <strong>{{ event.title }}</strong> has been approved by our admin team.</p>
+
+{% if admin_notes %}
+<div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745; margin: 15px 0;">
+    <h4 style="margin-top: 0;">Admin Notes:</h4>
+    <p>{{ admin_notes }}</p>
+</div>
+{% endif %}
+
+<p>You can view your event here: <a href="{{ event_url }}">{{ event_url }}</a></p>
+
+<p>Start promoting your event to attract attendees!</p>
+
+<p>Best regards,<br>
+The Event Management Team</p>
+{% endblock %}

@@ -46,6 +46,8 @@
                     <a href="{% url 'admin_tickets' %}"><i class="fas fa-ticket-alt me-2"></i> Tickets</a>
                     <a href="{% url 'admin_reviews' %}"><i class="fas fa-star me-2"></i> Reviews</a>
                     <a href="{% url 'admin_payments' %}"><i class="fas fa-money-bill me-2"></i> Payments</a>
+                    <a href="{% url 'admin_venues_list' %}"><i class="fas fa-building me-2"></i> Venues</a>
+                    <a href="{% url 'admin_ticket_tiers_list' %}"><i class="fas fa-layer-group me-2"></i> Ticket Tiers</a>
                     <form method="post" action="{% url 'admin_logout' %}" style="display: inline;">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{% url 'admin_dashboard' %}">

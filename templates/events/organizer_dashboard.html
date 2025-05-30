@@ -208,13 +208,22 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Revenue Chart
     const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    const dailySalesData = [
+        {% for item in daily_sales %}
+        {
+            date: '{{ item.date|date:"M d" }}',
+            revenue: {{ item.revenue|default:0 }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
     new Chart(revenueCtx, {
         type: 'line',
         data: {
-            labels: [{% for item in daily_sales %}'{{ item.date|date:"M d" }}',{% endfor %}],
+            labels: dailySalesData.map(item => item.date),
             datasets: [{
                 label: 'Daily Revenue',
-                data: [{% for item in daily_sales %}{{ item.revenue }},{% endfor %}],
+                data: dailySalesData.map(item => item.revenue),
                 borderColor: '#007bff',
                 tension: 0.4,
                 fill: true,
@@ -244,12 +253,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Ticket Type Distribution Chart
     const ticketTypeCtx = document.getElementById('ticketTypeChart').getContext('2d');
+    const ticketTypeData = [
+        {% for type in ticket_types %}
+        {
+            name: '{{ type.name }}',
+            count: {{ type.count|default:0 }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
     new Chart(ticketTypeCtx, {
         type: 'doughnut',
         data: {
-            labels: [{% for type in ticket_types %}'{{ type.name }}',{% endfor %}],
+            labels: ticketTypeData.map(item => item.name),
             datasets: [{
-                data: [{% for type in ticket_types %}{{ type.count }},{% endfor %}],
+                data: ticketTypeData.map(item => item.count),
                 backgroundColor: [
                     '#007bff',
                     '#28a745',
